@@ -34,12 +34,26 @@ The graph is a `networkx.DiGraph`, edges point downstream.
   the scalar state at that point: `x, y, z, Q, s`, and the boundary role
   (source / confluence / outlet).
 
-**Reach-assembly convention.** A full profile over a reach is
-`hstack(upstream node, edge interior array, downstream node)` — the pattern
-`setupDomain.py` already uses. Endpoint values are held **once**, on the node, and
-shared by every edge and every process that touches that junction. That shared node
-`z` is exactly how two processes (GRLP's confluence cell and TerraPIN's per-node
-cross-section) stay consistent for free.
+**Reach-assembly convention — and its limits.** A full profile over a reach can be
+assembled as `hstack(upstream node, edge interior array, downstream node)` — the
+pattern `setupDomain.py` uses — with endpoint values held once on the shared node.
+This shared-junction-node interpretation is natural for a process with **one degree
+of freedom per node** (e.g. TerraPIN, one cross-section per node).
+
+But it is a **per-process interpretation, not a universal convention** — and in
+particular it is *not* how GRLP discretizes. Verified against
+`grlp@366fb3e` (`Network.compute_Q_s`, `solver._face_conductance`): **GRLP has no
+shared junction degree of freedom.** Each segment owns *all* its nodes; a confluence
+node is the downstream segment's own first node (`z_down = downseg.z[0]`), and the
+tributaries contribute their distinct last nodes — the coupling is a special row in
+GRLP's matrix, not a shared variable. So the GRLP process carries the **full**
+segment array on each edge and treats junction nodes as topological markers only.
+
+The substrate therefore stores whatever fields a process needs and stays agnostic:
+full-array-on-edge (GRLP) and shared-node-endpoints (per-node processes) both live
+on the same graph. Where two processes must agree at a junction, that agreement is
+arranged explicitly by the schedule and the fields they share — not assumed from a
+single canonical junction `z`.
 
 ## The process interface
 
