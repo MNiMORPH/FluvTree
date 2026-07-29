@@ -6,5 +6,6 @@ See docs/fluvtree-engine-architecture.md.
 """
 
 from .grlp_process import GRLPProcess, build_grlp_network
+from .explicit_rule import ExplicitRule
 
-__all__ = ["GRLPProcess", "build_grlp_network"]
+__all__ = ["GRLPProcess", "build_grlp_network", "ExplicitRule"]
