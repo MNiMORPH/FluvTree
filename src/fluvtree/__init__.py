@@ -8,5 +8,6 @@ back. See docs/fluvtree-engine-architecture.md.
 """
 
 from .network import RiverNetwork
+from .scheduler import Scheduler
 
-__all__ = ["RiverNetwork"]
+__all__ = ["RiverNetwork", "Scheduler"]
