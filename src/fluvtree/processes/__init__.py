@@ -7,5 +7,7 @@ See docs/fluvtree-engine-architecture.md.
 
 from .grlp_process import GRLPProcess, build_grlp_network
 from .explicit_rule import ExplicitRule
+from .transport_limited import TransportLimitedRate, default_k_Qs
 
-__all__ = ["GRLPProcess", "build_grlp_network", "ExplicitRule"]
+__all__ = ["GRLPProcess", "build_grlp_network", "ExplicitRule",
+           "TransportLimitedRate", "default_k_Qs"]
