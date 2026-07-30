@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fluvtree"
+version = "0.0.1.dev0"
+description = "Directed convergent graph framework for river-network evolution: a network substrate + scheduler, plus the alluvial-river long-profile engine (power-law nonlinear-diffusion / transport-limited) with swappable gravel- and sand-bed closures"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "Andrew D. Wickert" }]
+dependencies = ["numpy", "scipy", "networkx", "matplotlib"]
+
+[project.optional-dependencies]
+# The GRLP process adapter and the gravel/sand benchmarks validate against the
+# published standalone models; not needed to run the built-in engine.
+grlp = ["grlp"]
+test = ["pytest"]
+
+# src-layout: the single ``fluvtree`` package lives under src/ (network, solvers,
+# closures, processes, scheduler, model). Nothing importable outside it.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["fluvtree*"]
