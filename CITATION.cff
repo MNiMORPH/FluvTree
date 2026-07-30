@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "FluvTree"
+authors:
+- family-names: "Wickert"
+  given-names: "Andrew D."
+  orcid: "https://orcid.org/0000-0002-9545-3365"
+- family-names: "McNab"
+  given-names: "Fergus"
+  orcid: "https://orcid.org/0000-0002-8358-1466"
+version: 0.0.1.dev0
+url: "https://github.com/awickert/FluvTree"
+repository-code: "https://github.com/awickert/FluvTree"
+license: GPL-3.0-or-later
+type: software
+keywords:
+  - geomorphology
+  - fluvial geomorphology
+  - river networks
+  - landscape evolution
+  - long-profile evolution
+abstract: "FluvTree is a directed convergent graph framework for river-network evolution: a network substrate and process scheduler, with pluggable long-profile engines run as composable rules on a shared network. It provides an alluvial (transport-limited) engine with gravel- and sand-bed closures and a bedrock (stream-power) engine."
