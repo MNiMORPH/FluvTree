@@ -16,12 +16,13 @@ See docs/DESIGN-structure-and-naming.md and docs/fluvtree-engine-architecture.md
 """
 
 from fluvtree.network import RiverNetwork
+from fluvtree.model import FluvTree
 from fluvtree.scheduler import Scheduler
 from fluvtree.processes import (
     GravelBed, SandBed, StreamPower, FixedBed, Rule, GRLP,
-    DiffusionProcess, build_network,
+    DiffusionProcess, Process, build_network,
 )
 
-__all__ = ["RiverNetwork", "Scheduler",
+__all__ = ["FluvTree", "RiverNetwork", "Scheduler",
            "GravelBed", "SandBed", "StreamPower", "FixedBed", "Rule", "GRLP",
-           "DiffusionProcess", "build_network"]
+           "DiffusionProcess", "Process", "build_network"]
