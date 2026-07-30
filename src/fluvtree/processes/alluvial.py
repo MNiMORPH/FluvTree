@@ -1,0 +1,89 @@
+"""
+Physics-named long-profile processes on the diffusion solver.
+
+``DiffusionProcess`` drives the :class:`DiffusionSolver`
+directly on the canonical :class:`RiverNetwork`: the solver walks the graph's own
+``x, z, Q, B`` fields, topology, and boundaries -- there is no separate engine
+object to build and no ``z`` to pull/push, because the solver reads and writes the
+graph in place. The transport **closure** selects the physics; ``GravelBed``
+and ``SandBed`` are thin presets.
+
+"Gravel"/"sand" are conventional shorthand -- the real discriminators are bank
+stability (noncohesive grain-threshold vs cohesive mud banks) and form drag; see
+the naming note in ``fluvtree.closures``.
+
+This is the in-tree counterpart to :class:`GRLP`, which wraps the external
+published ``grlp`` for cross-validation. Here the solver lives inside FluvTree and
+a closure picks the model, so gravel and sand are the *same* process.
+
+Time integration is backward Euler (the template's v1; BDF2 is a documented
+add-on). The nonlinear conductance is relinearized by Picard iteration: by default
+iterate-to-convergence (``tol``); pass ``niter`` for a fixed count instead. Note
+sand still needs a sloped initial ``z`` (its conductance is singular at ``S = 0``;
+see the parked issue).
+"""
+
+from fluvtree.solvers.diffusion import DiffusionSolver
+from fluvtree.closures.gravel import GravelClosure
+from fluvtree.closures.sand import SandClosure
+
+
+class DiffusionProcess(object):
+    """
+    Long-profile evolution with the diffusion solver and a transport closure.
+
+    Parameters
+    ----------
+    network : RiverNetwork
+        Canonical network carrying ``x, z, Q, B`` (edges) and ``S0`` (head nodes),
+        ``x_bl``/``z_bl`` (outlet node); optional ``Q_s_0`` (graph attribute).
+    closure : TransportClosure
+        The physics (e.g. ``GravelClosure`` or ``SandClosure``).
+    tol : float, optional
+        Picard convergence tolerance (default ``1e-4``): each step iterates the
+        nonlinear conductance until ``max|z_k - z_{k-1}| < tol``. Ignored when
+        ``niter`` is given.
+    niter : int, optional
+        Fixed number of Picard iterations per step instead of iterating to ``tol``
+        (matches GRLP's ``set_niter``; useful for bit-for-bit comparison).
+    """
+
+    reads = ("x", "z", "Q", "B", "S0", "x_bl", "z_bl")
+    writes = ("z",)
+
+    def __init__(self, network, closure, tol=1.0e-4, niter=None):
+        self.network = network
+        self.closure = closure
+        self._tol = None if niter is not None else tol
+        self._niter = 3 if niter is None else int(niter)
+        self.solver = DiffusionSolver(network, closure)
+
+    def step(self, dt, nt=1):
+        """Advance the long profile ``nt`` steps of ``dt`` [s], in place on the graph."""
+        self.solver.evolve(nt=nt, dt=dt, niter=self._niter, tol=self._tol)
+
+
+class GravelBed(DiffusionProcess):
+    """Gravel-bed long-profile process (noncohesive banks, no form drag).
+
+    Thin preset over :class:`DiffusionProcess` with a :class:`GravelClosure`. Grain
+    size ``D`` is optional (needed only to resolve width/depth, not to evolve)."""
+
+    def __init__(self, network, D=None, tol=1.0e-4, niter=None, **closure_kwargs):
+        super().__init__(network, GravelClosure(D=D, **closure_kwargs),
+                         tol=tol, niter=niter)
+
+
+class SandBed(DiffusionProcess):
+    """Sand-bed long-profile process (cohesive mud banks + form drag).
+
+    Thin preset over :class:`DiffusionProcess` with a :class:`SandClosure`. Requires
+    grain size ``D``, Manning's ``n``, and the critical bank stress
+    ``tau_crit_bank``. Use a sloped initial ``z`` (sand is singular at ``S=0``)."""
+
+    def __init__(self, network, D, n, tau_crit_bank,
+                 tol=1.0e-4, niter=None, **closure_kwargs):
+        super().__init__(
+            network,
+            SandClosure(D=D, n=n, tau_crit_bank=tau_crit_bank, **closure_kwargs),
+            tol=tol, niter=niter)

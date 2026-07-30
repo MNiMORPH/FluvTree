@@ -115,7 +115,7 @@ def test_rejects_process_bound_to_foreign_network():
 
 def test_scheduler_drives_grlp_process_matches_standalone():
     grlp = pytest.importorskip("grlp")
-    from fluvtree.processes import GRLPProcess, build_grlp_network
+    from fluvtree.processes import GRLP, build_grlp_network
 
     _D = 2000.0
     up, down = [[], [], [0, 1]], [[2], [2], []]
@@ -140,7 +140,7 @@ def test_scheduler_drives_grlp_process_matches_standalone():
 
     # via the scheduler
     rn = build_grlp_network(up, down, x, z0, Q, B, S0, x_bl, z_bl)
-    sched = Scheduler(rn, [GRLPProcess(rn, configure=bdf2)])
+    sched = Scheduler(rn, [GRLP(rn, configure=bdf2)])
 
     dt = 3.15e10
     for _ in range(6):

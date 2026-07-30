@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 
 from topologies import SPECS, widths, S0, Z_BL
-from fluvtree.processes import build_grlp_network, ExplicitRule, TransportLimitedRate
+from fluvtree.processes import build_grlp_network, Rule, TransportLimitedRate
 
 _REF = np.load(os.path.join(os.path.dirname(__file__), "reference.npz"))
 
@@ -77,7 +77,7 @@ def test_cold_start_relaxes_to_grlp(name):
     spec = SPECS[name]
     golden = _golden_segments(name)
     rn = _fluvtree_network(spec, [np.zeros(len(xi)) for xi in spec["x"]])
-    rule = ExplicitRule(rn, TransportLimitedRate())
+    rule = Rule(rn, TransportLimitedRate())
     for _ in range(120000):
         rule.step(1.0e7)
     for s in rn.segment_ids:
