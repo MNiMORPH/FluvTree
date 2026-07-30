@@ -18,7 +18,7 @@ import matplotlib
 matplotlib.use("Agg")           # headless: no display needed
 
 import fluvtree as ft
-from fluvtree.plot import long_profile
+from fluvtree.plot import long_profile, slope_area, planform
 from fluvtree.processes import build_network
 
 
@@ -60,6 +60,36 @@ def test_model_plot_delegates_to_long_profile():
     ax = m.plot(lw=2)
     assert ax.get_ylabel() == "Elevation [m]"
     assert len(ax.lines) == 2 * len(m.network.segment_ids)
+
+
+def test_slope_area_draws_and_fits():
+    net = _confluence()
+    ax = slope_area(net)                          # defaults to slope vs Q
+    assert ax.get_xlabel() == "Discharge [m$^3$/s]"
+    assert ax.get_ylabel() == "Slope"
+    assert len(ax.lines) == 2                      # scatter + the fit line
+    assert len(slope_area(_confluence(), fit=False).lines) == 1
+    assert ax.get_xscale() == "log" and ax.get_yscale() == "log"
+
+
+def test_planform_lanes_reaches_and_connectors():
+    net = _confluence()
+    ax = planform(net)
+    # a line per reach + a connector per non-mouth reach
+    n = len(net.segment_ids)
+    n_mouths = len(net.mouth_segments())
+    assert len(ax.lines) == 2 * n - n_mouths
+    assert ax.get_xlabel() == "Downstream distance [m]"
+    # the two channel heads sit on distinct lanes; the confluence between them
+    head_lanes = sorted({ax.lines[i].get_ydata()[0] for i in range(len(ax.lines))})
+    assert len(head_lanes) >= 2
+
+
+def test_model_plot_conveniences_delegate():
+    m = ft.FluvTree(_confluence()).add(ft.GravelBed(D=0.05))
+    m.run(nt=30, dt=3.15e10)
+    assert m.plot_slope_area().get_ylabel() == "Slope"
+    assert m.plot_planform().get_xlabel() == "Downstream distance [m]"
 
 
 def test_import_fluvtree_is_matplotlib_free():

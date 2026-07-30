@@ -9,11 +9,14 @@ imports this module; the arrow points one way (``plot`` reads the core), so bare
 :meth:`fluvtree.model.FluvTree.plot` is the convenience that calls
 :func:`long_profile` on its network.
 
-Currently: :func:`long_profile` -- the canonical GRLP-style long profile
-(elevation vs downstream distance, reaches joined across confluences). Planform and
-slope-area views are the natural next additions.
+Three views: :func:`long_profile` (elevation vs downstream distance, reaches joined
+across confluences -- the canonical GRLP plot), :func:`slope_area` (the log-log
+slope diagnostic, with an optional power-law fit), and :func:`planform` (a
+schematic network map). :class:`fluvtree.model.FluvTree` has ``plot`` /
+``plot_slope_area`` / ``plot_planform`` conveniences over them.
 """
 
+import numpy as np
 import matplotlib.pyplot as plt
 
 
@@ -67,4 +70,115 @@ def long_profile(network, ax=None, color="C0", connect_baselevel=True, **kwargs)
                 ax.plot([x[-1], x_bl], [z[-1], z_bl], color=color, **kwargs)
     ax.set_xlabel("Downstream distance [m]")
     ax.set_ylabel("Elevation [m]")
+    return ax
+
+
+_ABSCISSA_LABEL = {"Q": "Discharge [m$^3$/s]", "A": "Drainage area [m$^2$]"}
+
+
+def slope_area(network, against="Q", ax=None, fit=True, **kwargs):
+    """
+    The log-log slope diagnostic: bed slope vs an area-like abscissa.
+
+    Slope ``|dz/dx|`` is computed at each interior interval of every reach and
+    plotted against ``against`` at the interval midpoint. FluvTree networks carry
+    discharge, so ``against`` defaults to ``"Q"`` (slope-discharge -- the
+    transport-relevant form); pass ``against="A"`` for the classic slope-area if a
+    drainage-area field is present. With ``fit`` (default), a straight line is fit
+    in log-log space and its exponent annotated (for ``"A"`` its negative is the
+    concavity index).
+
+    Parameters
+    ----------
+    network : RiverNetwork
+    against : str, optional
+        Per-segment field for the abscissa (default ``"Q"``; ``"A"`` for area).
+    ax : matplotlib Axes, optional
+    fit : bool, optional
+        Fit and draw a log-log power law (default True).
+    **kwargs
+        Passed to the scatter ``ax.loglog`` call.
+
+    Returns
+    -------
+    matplotlib Axes
+    """
+    if ax is None:
+        _, ax = plt.subplots()
+    slopes, absc = [], []
+    for s in network.segment_ids:
+        x = np.asarray(network.get_segment_field(s, "x"), float)
+        z = np.asarray(network.get_segment_field(s, "z"), float)
+        a = np.asarray(network.get_segment_field(s, against), float)
+        slopes.append(np.abs(np.diff(z) / np.diff(x)))
+        absc.append(0.5 * (a[:-1] + a[1:]))
+    S = np.concatenate(slopes)
+    A = np.concatenate(absc)
+    keep = (S > 0) & (A > 0)                 # log-log needs positives
+    S, A = S[keep], A[keep]
+    kwargs.setdefault("marker", ".")
+    kwargs.setdefault("linestyle", "none")
+    ax.loglog(A, S, **kwargs)
+    if fit and S.size >= 2:
+        slope, intercept = np.polyfit(np.log10(A), np.log10(S), 1)
+        af = np.array([A.min(), A.max()])
+        ax.loglog(af, 10.0 ** intercept * af ** slope, "-", color="k", lw=1)
+        ax.annotate("exponent = %.3f" % slope, xy=(0.05, 0.05),
+                    xycoords="axes fraction")
+    ax.set_xlabel(_ABSCISSA_LABEL.get(against, against))
+    ax.set_ylabel("Slope")
+    return ax
+
+
+def _schematic_lanes(network, spacing=1.0):
+    """Assign each reach a schematic y-lane: channel heads get evenly-spaced lanes
+    in depth-first order, and every confluence sits at the mean of its tributaries'
+    lanes (a dendrogram layout -- no overlaps on a convergent tree)."""
+    lane = {}
+    counter = [0]
+
+    def assign(seg):
+        ups = sorted(network.upstream_segments(seg))
+        if not ups:
+            lane[seg] = counter[0] * spacing
+            counter[0] += 1
+        else:
+            for u in ups:
+                assign(u)
+            lane[seg] = float(np.mean([lane[u] for u in ups]))
+
+    for mouth in sorted(network.mouth_segments()):
+        assign(mouth)
+    return lane
+
+
+def planform(network, ax=None, spacing=1.0, **kwargs):
+    """
+    A schematic map of the network: real downstream distance across, branches apart.
+
+    Each reach is drawn at its own y-lane over its true ``x`` range and joined to
+    its downstream reach at the confluence, so the network's branching structure is
+    legible (the FluvTree analogue of GRLP's ``Network.plot`` schematic). The
+    ``y`` axis is schematic -- lanes, not coordinates -- since FluvTree's ``x`` is
+    downstream distance, not a map coordinate; a true planform awaits map-coordinate
+    fields (e.g. from DEM extraction).
+
+    Returns
+    -------
+    matplotlib Axes
+    """
+    if ax is None:
+        _, ax = plt.subplots()
+    lane = _schematic_lanes(network, spacing=spacing)
+    for s in network.segment_ids:
+        x = np.asarray(network.get_segment_field(s, "x"), float)
+        line, = ax.plot(x, np.full(x.shape, lane[s]), **kwargs)
+        d = network.downstream_segment(s)
+        if d is not None:                    # join to the downstream reach's lane
+            xd = network.get_segment_field(d, "x")
+            ax.plot([x[-1], xd[0]], [lane[s], lane[d]],
+                    color=line.get_color(), **kwargs)
+    ax.set_xlabel("Downstream distance [m]")
+    ax.set_yticks([])
+    ax.set_ylabel("branches (schematic)")
     return ax

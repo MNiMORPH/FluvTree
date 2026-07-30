@@ -110,3 +110,15 @@ class FluvTree(object):
         """
         from fluvtree.plot import long_profile
         return long_profile(self.network, ax=ax, **kwargs)
+
+    def plot_slope_area(self, against="Q", ax=None, **kwargs):
+        """The log-log slope diagnostic (slope vs discharge by default). Delegates
+        to :func:`fluvtree.plot.slope_area`."""
+        from fluvtree.plot import slope_area
+        return slope_area(self.network, against=against, ax=ax, **kwargs)
+
+    def plot_planform(self, ax=None, **kwargs):
+        """A schematic map of the network. Delegates to
+        :func:`fluvtree.plot.planform`."""
+        from fluvtree.plot import planform
+        return planform(self.network, ax=ax, **kwargs)
