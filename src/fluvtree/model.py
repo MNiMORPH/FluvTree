@@ -96,3 +96,17 @@ class FluvTree(object):
             while self.t < target - eps:
                 self._scheduler.step(min(dt, target - self.t))
         return self.t
+
+    # ------------------------------------------------------------------ #
+    # Views
+    # ------------------------------------------------------------------ #
+
+    def plot(self, ax=None, **kwargs):
+        """
+        Plot the current long profile (elevation vs downstream distance).
+
+        Delegates to :func:`fluvtree.plot.long_profile`, imported lazily so bare
+        ``import fluvtree`` pulls in no matplotlib. Returns the matplotlib ``Axes``.
+        """
+        from fluvtree.plot import long_profile
+        return long_profile(self.network, ax=ax, **kwargs)
