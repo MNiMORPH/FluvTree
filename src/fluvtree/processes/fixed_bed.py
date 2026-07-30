@@ -19,8 +19,10 @@ nonconservative -- it fabricates/destroys the sediment the erosion moved -- whic
 exactly why this process moves nothing.)
 """
 
+from fluvtree.processes.base import Process
 
-class FixedBed(object):
+
+class FixedBed(Process):
     """
     Non-erodible bedrock: returns its bed unchanged (no erosion possible).
 
@@ -35,11 +37,15 @@ class FixedBed(object):
     reads = ()
     writes = ()
 
-    def __init__(self, network, segments=None):
-        self.network = network
-        self.segments = (list(network.segment_ids) if segments is None
-                         else list(segments))
+    def __init__(self, network=None, segments=None):
+        self._segments_arg = segments
+        self.segments = None
+        super().__init__(network)
 
-    def step(self, dt):
+    def _on_bind(self):
+        self.segments = (list(self.network.segment_ids)
+                         if self._segments_arg is None else list(self._segments_arg))
+
+    def step(self, dt, nt=1):
         """No erosion possible: the bed is returned unchanged."""
         pass

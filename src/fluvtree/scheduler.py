@@ -32,16 +32,20 @@ class Scheduler(object):
     def __init__(self, network, processes=None):
         self.network = network
         self.processes = []
-        self.t = 0.0
-        network.graph.graph.setdefault("t", self.t)
+        # canonical time lives on the graph; resume from it if already set
+        self.t = float(network.graph.graph.setdefault("t", 0.0))
         if processes is not None:
             for p in processes:
                 self.add(p)
 
     def add(self, process):
-        """Append a process to the ruleset (runs after those already added)."""
+        """Append a process to the ruleset (runs after those already added). An
+        unbound process (constructed without a network) is bound to this scheduler's
+        network; a process already bound to a *different* network is an error."""
         bound = getattr(process, "network", None)
-        if bound is not None and bound is not self.network:
+        if bound is None and hasattr(process, "bind"):
+            process.bind(self.network)
+        elif bound is not None and bound is not self.network:
             raise ValueError(
                 "process is bound to a different RiverNetwork than the scheduler")
         self.processes.append(process)

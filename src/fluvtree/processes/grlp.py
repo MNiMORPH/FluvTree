@@ -26,6 +26,7 @@ never the reverse.
 import numpy as np
 
 from fluvtree.network import RiverNetwork
+from fluvtree.processes.base import Process
 
 
 def build_grlp_network(upstream_segment_IDs, downstream_segment_IDs,
@@ -66,15 +67,16 @@ def build_grlp_network(upstream_segment_IDs, downstream_segment_IDs,
     return rn
 
 
-class GRLP(object):
+class GRLP(Process):
     """
     GRLP long-profile evolution as a FluvTree process.
 
     Parameters
     ----------
-    network : RiverNetwork
+    network : RiverNetwork, optional
         The canonical network. Must carry the fields listed in the module
-        docstring (see :func:`build_grlp_network`).
+        docstring (see :func:`build_grlp_network`). Omit to bind later via a
+        :class:`FluvTree` model or :class:`Scheduler`.
     configure : callable, optional
         ``configure(grlp_network)`` called once after the internal
         ``grlp.Network`` is built, to set the integration scheme (e.g.
@@ -85,10 +87,16 @@ class GRLP(object):
     reads = ("x", "z", "Q", "B", "S0", "x_bl", "z_bl")
     writes = ("z",)
 
-    def __init__(self, network, configure=None):
+    def __init__(self, network=None, configure=None):
+        self.configure = configure
+        self._segs = None
+        self.grlp_network = None
+        super().__init__(network)
+
+    def _on_bind(self):
         import grlp
 
-        self.network = network
+        network = self.network
         segs = list(network.segment_ids)
         self._segs = segs
 
@@ -116,8 +124,8 @@ class GRLP(object):
             downstream_segment_IDs=down,
             x=x, z=z, Q=Q, B=B,
         )
-        if configure is not None:
-            configure(gnet)
+        if self.configure is not None:
+            self.configure(gnet)
         gnet.get_z_lengths()
         self.grlp_network = gnet
 
@@ -142,6 +150,7 @@ class GRLP(object):
         re-pulling ``B``/``Q``/``ssd`` is the hook for a lateral process (e.g.
         TerraPIN) and is deferred until one exists.
         """
+        self._require_bound()
         self._pull_z()
         self.grlp_network.evolve_threshold_width_river_network(nt=nt, dt=dt)
         self._push_z()

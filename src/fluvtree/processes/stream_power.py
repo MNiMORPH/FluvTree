@@ -11,18 +11,20 @@ the sweep mutates the graph's ``z`` arrays directly.
 not diffusion.
 """
 
+from fluvtree.processes.base import Process
 from fluvtree.solvers.advection import sweep_order, incise_n1_step
 
 
-class StreamPower(object):
+class StreamPower(Process):
     """
     n = 1 stream-power bedrock incision.
 
     Parameters
     ----------
-    network : RiverNetwork
+    network : RiverNetwork, optional
         Canonical network carrying ``x, z, Q`` (edges) and base level ``x_bl``,
-        ``z_bl`` (outlet node).
+        ``z_bl`` (outlet node). Omit to bind later via a :class:`FluvTree` model or
+        :class:`Scheduler`.
     K : float
         Erodibility.
     m : float, optional
@@ -35,14 +37,18 @@ class StreamPower(object):
     reads = ("x", "z", "Q", "x_bl", "z_bl")
     writes = ("z",)
 
-    def __init__(self, network, K, m=0.5, U=0.0):
-        self.network = network
+    def __init__(self, network=None, K=None, m=0.5, U=0.0):
         self.K = K
         self.m = m
         self.U = U
-        self._order = sweep_order(network)      # fixed topology: computed once
+        self._order = None
+        super().__init__(network)
+
+    def _on_bind(self):
+        self._order = sweep_order(self.network)     # fixed topology: computed once
 
     def step(self, dt, nt=1):
         """Advance ``nt`` implicit steps of ``dt`` (in place on the graph's z)."""
+        self._require_bound()
         for _ in range(int(nt)):
             incise_n1_step(self.network, self._order, self.K, self.m, self.U, dt)

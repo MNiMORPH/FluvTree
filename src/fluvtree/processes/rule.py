@@ -18,15 +18,18 @@ GRLP process) keeps large-``dt`` stability; door 2 does not.
 
 import numpy as np
 
+from fluvtree.processes.base import Process
 
-class Rule(object):
+
+class Rule(Process):
     """
     Evolve a per-segment field by explicitly integrating a user rate.
 
     Parameters
     ----------
-    network : RiverNetwork
-        The canonical network the rule reads and writes.
+    network : RiverNetwork, optional
+        The canonical network the rule reads and writes. Omit to bind later via a
+        :class:`FluvTree` model or :class:`Scheduler`.
     rate : callable
         ``rate(network, dt) -> {seg_id: dfield_dt_array}``. Each returned array is
         the time derivative of ``field`` on that segment's interior nodes.
@@ -34,14 +37,15 @@ class Rule(object):
         The per-segment field to evolve (default ``"z"``).
     """
 
-    def __init__(self, network, rate, field="z"):
-        self.network = network
+    def __init__(self, network=None, rate=None, field="z"):
         self.rate = rate
         self.field = field
         self.writes = (field,)
+        super().__init__(network)
 
-    def step(self, dt):
+    def step(self, dt, nt=1):
         """Advance ``field`` by one forward-Euler step of ``dt`` [s]."""
+        self._require_bound()
         rates = self.rate(self.network, dt)
         for seg, dfield_dt in rates.items():
             value = self.network.get_segment_field(seg, self.field)

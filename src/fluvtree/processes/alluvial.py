@@ -23,20 +23,22 @@ sand still needs a sloped initial ``z`` (its conductance is singular at ``S = 0`
 see the parked issue).
 """
 
+from fluvtree.processes.base import Process
 from fluvtree.solvers.diffusion import DiffusionSolver
 from fluvtree.closures.gravel import GravelClosure
 from fluvtree.closures.sand import SandClosure
 
 
-class DiffusionProcess(object):
+class DiffusionProcess(Process):
     """
     Long-profile evolution with the diffusion solver and a transport closure.
 
     Parameters
     ----------
-    network : RiverNetwork
+    network : RiverNetwork, optional
         Canonical network carrying ``x, z, Q, B`` (edges) and ``S0`` (head nodes),
-        ``x_bl``/``z_bl`` (outlet node); optional ``Q_s_0`` (graph attribute).
+        ``x_bl``/``z_bl`` (outlet node); optional ``Q_s_0`` (graph attribute). Omit
+        to bind later via a :class:`FluvTree` model or :class:`Scheduler`.
     closure : TransportClosure
         The physics (e.g. ``GravelClosure`` or ``SandClosure``).
     tol : float, optional
@@ -51,15 +53,19 @@ class DiffusionProcess(object):
     reads = ("x", "z", "Q", "B", "S0", "x_bl", "z_bl")
     writes = ("z",)
 
-    def __init__(self, network, closure, tol=1.0e-4, niter=None):
-        self.network = network
+    def __init__(self, network=None, closure=None, tol=1.0e-4, niter=None):
         self.closure = closure
         self._tol = None if niter is not None else tol
         self._niter = 3 if niter is None else int(niter)
-        self.solver = DiffusionSolver(network, closure)
+        self.solver = None
+        super().__init__(network)
+
+    def _on_bind(self):
+        self.solver = DiffusionSolver(self.network, self.closure)
 
     def step(self, dt, nt=1):
         """Advance the long profile ``nt`` steps of ``dt`` [s], in place on the graph."""
+        self._require_bound()
         self.solver.evolve(nt=nt, dt=dt, niter=self._niter, tol=self._tol)
 
 
@@ -69,7 +75,7 @@ class GravelBed(DiffusionProcess):
     Thin preset over :class:`DiffusionProcess` with a :class:`GravelClosure`. Grain
     size ``D`` is optional (needed only to resolve width/depth, not to evolve)."""
 
-    def __init__(self, network, D=None, tol=1.0e-4, niter=None, **closure_kwargs):
+    def __init__(self, network=None, D=None, tol=1.0e-4, niter=None, **closure_kwargs):
         super().__init__(network, GravelClosure(D=D, **closure_kwargs),
                          tol=tol, niter=niter)
 
@@ -81,7 +87,7 @@ class SandBed(DiffusionProcess):
     grain size ``D``, Manning's ``n``, and the critical bank stress
     ``tau_crit_bank``. Use a sloped initial ``z`` (sand is singular at ``S=0``)."""
 
-    def __init__(self, network, D, n, tau_crit_bank,
+    def __init__(self, network=None, D=None, n=None, tau_crit_bank=None,
                  tol=1.0e-4, niter=None, **closure_kwargs):
         super().__init__(
             network,
