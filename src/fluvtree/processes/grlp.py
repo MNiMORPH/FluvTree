@@ -25,7 +25,7 @@ never the reverse.
 
 import numpy as np
 
-from ..network import RiverNetwork
+from fluvtree.network import RiverNetwork
 
 
 def build_grlp_network(upstream_segment_IDs, downstream_segment_IDs,
@@ -43,10 +43,13 @@ def build_grlp_network(upstream_segment_IDs, downstream_segment_IDs,
                                          downstream_segment_IDs)
     segs = rn.segment_ids
     for i, s in enumerate(segs):
-        rn.set_segment_field(s, "x", np.asarray(x[i], dtype=float))
-        rn.set_segment_field(s, "z", np.asarray(z[i], dtype=float))
-        rn.set_segment_field(s, "Q", np.asarray(Q[i], dtype=float))
-        rn.set_segment_field(s, "B", np.asarray(B[i], dtype=float))
+        # copy, so the graph owns independent arrays: guards against a caller
+        # passing aliased arrays (e.g. ``[np.zeros(n)] * k``, which repeats one
+        # object) -- otherwise the reaches would share and clobber one another.
+        rn.set_segment_field(s, "x", np.array(x[i], dtype=float))
+        rn.set_segment_field(s, "z", np.array(z[i], dtype=float))
+        rn.set_segment_field(s, "Q", np.array(Q[i], dtype=float))
+        rn.set_segment_field(s, "B", np.array(B[i], dtype=float))
     heads = sorted(rn.head_segments())
     try:
         iter(S0)
@@ -63,7 +66,7 @@ def build_grlp_network(upstream_segment_IDs, downstream_segment_IDs,
     return rn
 
 
-class GRLPProcess(object):
+class GRLP(object):
     """
     GRLP long-profile evolution as a FluvTree process.
 

@@ -15,7 +15,7 @@ import pytest
 
 grlp = pytest.importorskip("grlp")
 
-from fluvtree.processes import GRLPProcess, build_grlp_network
+from fluvtree.processes import GRLP, build_grlp_network
 
 
 _D = 2000.0
@@ -89,7 +89,7 @@ def test_process_matches_standalone_grlp(name, scheme):
     rn = build_grlp_network(
         spec["up"], spec["down"], spec["x"], z0, spec["Q"],
         [B * np.ones(len(xi)) for xi in spec["x"]], S0, spec["x_bl"], Z_BL)
-    proc = GRLPProcess(rn, configure=configure)
+    proc = GRLP(rn, configure=configure)
 
     dt = 3.15e10
     for _ in range(6):

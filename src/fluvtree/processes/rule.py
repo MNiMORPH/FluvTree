@@ -1,7 +1,7 @@
 """
 Door 2: an arbitrary explicit rule as a process.
 
-``ExplicitRule`` forward-integrates a user-supplied rate over the canonical graph.
+``Rule`` forward-integrates a user-supplied rate over the canonical graph.
 This is the general escape hatch: any evolution law expressible as a rate of change
 of a per-segment field can be run as a FluvTree process, with no implicit machinery
 and no ties to GRLP.
@@ -19,7 +19,7 @@ GRLP process) keeps large-``dt`` stability; door 2 does not.
 import numpy as np
 
 
-class ExplicitRule(object):
+class Rule(object):
     """
     Evolve a per-segment field by explicitly integrating a user rate.
 

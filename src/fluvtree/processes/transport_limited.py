@@ -1,7 +1,7 @@
 """
 A transport-limited long-profile rule for door 2 -- GRLP's physics, self-contained.
 
-This is a demonstration that the explicit-rule hook (:class:`ExplicitRule`) can
+This is a demonstration that the explicit-rule hook (:class:`Rule`) can
 carry real geomorphic physics and reproduce the GRLP test set, with **no GRLP
 dependency**: the flux law and boundary conditions are re-expressed as a
 finite-volume Exner update on the FluvTree substrate. Because a transport-limited
@@ -43,7 +43,7 @@ def default_k_Qs(lambda_p=0.35, rho_s=2650.0, rho=1000.0, g=9.805,
 class TransportLimitedRate(object):
     """
     A finite-volume transport-limited Exner rate, callable as ``rate(network, dt)``
-    for :class:`~fluvtree.processes.ExplicitRule`.
+    for :class:`~fluvtree.processes.Rule`.
 
     Reads per-segment ``x, z, Q, B`` (edges) and the boundary fields ``S0`` (head
     nodes) and ``x_bl``/``z_bl`` (outlet node) off the graph -- the layout that

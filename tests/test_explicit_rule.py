@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from fluvtree import RiverNetwork, Scheduler
-from fluvtree.processes import ExplicitRule
+from fluvtree.processes import Rule
 
 
 _CHAIN = dict(up=[[], [0]], down=[[1], []])
@@ -33,7 +33,7 @@ def test_uniform_uplift_exact():
         return {s: U * np.ones_like(net.get_segment_field(s, "z"))
                 for s in net.segment_ids}
 
-    rule = ExplicitRule(rn, uplift)
+    rule = Rule(rn, uplift)
     nt, dt = 7, 3.15e7
     for _ in range(nt):
         rule.step(dt)
@@ -49,7 +49,7 @@ def test_linear_decay_exact():
     def decay(net, dt):
         return {s: -k * net.get_segment_field(s, "z") for s in net.segment_ids}
 
-    rule = ExplicitRule(rn, decay)
+    rule = Rule(rn, decay)
     dt, nt = 1.0, 5
     for _ in range(nt):
         rule.step(dt)
@@ -64,7 +64,7 @@ def test_omitted_segments_unchanged():
     def only_seg0(net, dt):
         return {0: np.ones_like(net.get_segment_field(0, "z"))}
 
-    ExplicitRule(rn, only_seg0).step(1.0)
+    Rule(rn, only_seg0).step(1.0)
     assert np.allclose(rn.get_segment_field(1, "z"), z_seg1)  # untouched
 
 
@@ -76,7 +76,7 @@ def test_evolves_named_field():
     def deposit(net, dt):
         return {s: np.ones(3) for s in net.segment_ids}
 
-    ExplicitRule(rn, deposit, field="sed").step(2.0)
+    Rule(rn, deposit, field="sed").step(2.0)
     for s in rn.segment_ids:
         assert np.allclose(rn.get_segment_field(s, "sed"), 2.0)
         assert np.allclose(rn.get_segment_field(s, "z"), [10.0, 20.0, 30.0])
@@ -91,7 +91,7 @@ def test_runs_under_scheduler():
                 for s in net.segment_ids}
 
     z0 = {s: rn.get_segment_field(s, "z").copy() for s in rn.segment_ids}
-    sched = Scheduler(rn, [ExplicitRule(rn, uplift)])
+    sched = Scheduler(rn, [Rule(rn, uplift)])
     nt, dt = 4, 100.0
     sched.run(nt, dt)
     for s in rn.segment_ids:
