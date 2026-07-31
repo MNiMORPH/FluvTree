@@ -16,11 +16,12 @@ This is the in-tree counterpart to :class:`GRLP`, which wraps the external
 published ``grlp`` for cross-validation. Here the solver lives inside FluvTree and
 a closure picks the model, so gravel and sand are the *same* process.
 
-Time integration is backward Euler (the template's v1; BDF2 is a documented
-add-on). The nonlinear conductance is relinearized by Picard iteration: by default
-iterate-to-convergence (``tol``); pass ``niter`` for a fixed count instead. Note
-sand still needs a sloped initial ``z`` (its conductance is singular at ``S = 0``;
-see the parked issue).
+Time integration is backward Euler; GRLP's default is BDF2, which is not yet
+implemented here (a known fidelity gap, not a design choice -- see the solver
+docstring). The nonlinear conductance is relinearized by Picard iteration: by
+default iterate-to-convergence (``tol``); pass ``niter`` for a fixed count instead.
+Note sand still needs a sloped initial ``z`` (its conductance is singular at
+``S = 0``; see the parked issue).
 """
 
 from fluvtree.processes.base import Process

@@ -10,9 +10,12 @@ Outcome: `fluvtree/solvers/diffusion.py` (`DiffusionSolver`) walks the shared
 Euler (~1e-13) on a chain, a 1-into-1 series, and a multi-tributary confluence, and
 matches `srlp`'s steady state; `fluvtree/closures/base.py` is the
 `TransportClosure` interface only, with concrete closures in `fluvtree/closures/gravel.py` / `sand.py`. The 2258-line vendored engine is gone; `fluvtree.solvers.diffusion` depends on
-`numpy` + `scipy.sparse` alone. v1 is backward Euler + constant `B`; BDF2, adaptive
-stepping, and the volume-first transform for dynamic `B` remain the documented
-next adds (see "Later, not now"). The rest of this note is the as-built design.
+`numpy` + `scipy.sparse` alone. It integrates in backward Euler with constant `B`.
+**Fidelity note (2026-07-31): this is currently an *unfaithful* port.** GRLP's
+default is BDF2 + iterate-to-convergence; BDF2 and the Sternberg gravel-abrasion
+sink are not ported and were mis-framed here as "later add-ons" — they are
+GRLP-parity gaps to close, not a designed scope (see "GRLP-parity gaps" below).
+The rest of this note is the as-built design.
 
 ## What it is
 
@@ -54,8 +57,9 @@ a core edit.
   - Picard-iterate to convergence (nonlinear coefficient relinearizes on the
     current iterate).
 - `engine.py` (thin) -- orchestration: step / evolve `nt` steps, time integration
-  (backward Euler first; BDF2 as a documented add-on), reading reach state from the
-  shared `network` and writing `z` back.
+  (backward Euler; BDF2 is GRLP's default and is not yet ported -- a fidelity gap,
+  see "GRLP-parity gaps"), reading reach state from the shared `network` and
+  writing `z` back.
 
 ## Surgically lifted from GRLP (the hard-won, validated pieces)
 
@@ -91,19 +95,33 @@ for-bit against `grlp`:
 diagnostics if wanted); the dozens of `set_*` user setters; the redundant
 `networkx` graph.
 
-## Later, not now
+## GRLP-parity gaps and genuinely-later items
 
-- BDF2 + adaptive time stepping (backward Euler first).
-- The volume-first transform for spatially/temporally varying `B` (add when a
-  process needs dynamic width).
+**GRLP-parity gaps (flagged 2026-07-31) — NOT agreed deferrals. The lift dropped
+these and this note mis-framed them as "later"; they are fidelity gaps to close for
+a faithful port:**
+
+- **BDF2** — GRLP's *default* time integration; restore as FluvTree's default.
+  Constant-`B` BDF2 needs only the three-level time term (`time_diag = 3/2`, RHS
+  history `2 zⁿ − ½ zⁿ⁻¹`) + one extra history level; no volume-first required.
+- **Sternberg gravel abrasion / downstream fining**, and the full source-term set
+  (`ssd`, uplift `U`) wired through the processes.
+
+**Genuinely later (separate work, or the modeller's call):**
+
+- The volume-first transform for spatially/temporally varying `B` (transient valley
+  width — Andy's separate valley-realism task; add when a process needs dynamic width).
+- Adaptive time stepping — Andy found it a convenience, not a speed-up (a "fail" for
+  GRLP); skip unless asked.
 - The hydraulic-radius sand `S->0` regularization (parked issue) and its taper.
 
 ## Port spec (execution guide for the solver lift)
 
-Lift the assembly *math* from the vendored `fluvtree/solvers/diffusion.py`
-(`grlp@366fb3e`), written fresh onto a lightweight `Reach` sourced from the shared
-`network` + closure. Scope for v1: **backward Euler, constant B** (so the
-volume-first transform is identity, `J = 1`; no BDF2/adaptive yet).
+Lift the assembly *math* from the vendored GRLP solver (`grlp@366fb3e`,
+`grlp/solver.py`), written fresh onto the shared `network` + closure. Scope actually
+lifted: **backward Euler, constant B** (so the volume-first transform is identity,
+`J = 1`) — a *subset* of GRLP. BDF2 (GRLP's default) and the abrasion sink were NOT
+lifted; those are the GRLP-parity gaps above, not a planned phasing.
 
 Per-reach inputs needed by the solver (build from `network` reach fields + closure):
 `x, z, Q, B`; `C0 = closure.k_Qs * I * dt / ((1 - lambda_p) * sinuosity**p)`;

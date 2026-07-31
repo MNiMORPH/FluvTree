@@ -28,10 +28,15 @@ boundaries -- is lifted from GRLP's validated network solver (``grlp@366fb3e``)
 and reproduces it bit-for-bit. Only the data *access* is rewritten onto the shared
 network.
 
-Scope (v1): backward Euler, constant ``B``. Picard iteration relinearizes the
-nonlinear conductance on the current iterate while the right-hand-side history is
-frozen at the start-of-step elevation. BDF2, adaptive stepping, and the
-volume-first transform for dynamic width are documented add-ons, not yet here.
+Time integration is **backward Euler**, and ``B`` is constant. Picard iteration
+relinearizes the nonlinear conductance on the current iterate while the
+right-hand-side history is frozen at the start-of-step elevation.
+
+Known gaps from GRLP (not yet ported -- fidelity gaps to close, not design
+choices): GRLP's *default* is BDF2 (2nd-order in time), so out of the box this is
+a lower-order integrator than GRLP; the volume-first transform (for
+spatially/temporally varying ``B``) and the Sternberg gravel-abrasion /
+downstream-fining sink are also not implemented.
 """
 
 import warnings
