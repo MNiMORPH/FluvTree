@@ -58,25 +58,39 @@ class DiffusionProcess(Process):
     writes = ("z",)
 
     def __init__(self, network=None, closure=None, tol=1.0e-4, niter=None,
-                 gravel_attrition=None, uplift=None):
+                 gravel_attrition=None, uplift=None, source_sink=None):
         self.closure = closure
         self._tol = None if niter is not None else tol
         self._niter = 3 if niter is None else int(niter)
         self._gravel_attrition = gravel_attrition
         self._uplift = uplift
+        self._source_sink = source_sink
         self.solver = None
         super().__init__(network)
 
     def _on_bind(self):
         self.solver = DiffusionSolver(self.network, self.closure)
 
+    def _static_source_rate(self):
+        """Sum the static per-node forcings (uplift + distributed source/sink) into
+        one ``source_rate`` for the solver, or ``None`` if neither is set."""
+        from fluvtree.common.rates import broadcast_rate
+        nseg = len(self.network.segment_ids)
+        total = None
+        for spec in (self._uplift, self._source_sink):
+            if spec is None:
+                continue
+            contrib = broadcast_rate(self.network, spec)
+            if total is None:
+                total = [c.copy() for c in contrib]
+            else:
+                total = [total[si] + contrib[si] for si in range(nseg)]
+        return total
+
     def step(self, dt, nt=1):
         """Advance the long profile ``nt`` steps of ``dt`` [s], in place on the graph."""
         self._require_bound()
-        source_rate = None
-        if self._uplift is not None:
-            from fluvtree.common.tectonics import uplift_rate
-            source_rate = uplift_rate(self.network, self._uplift)
+        source_rate = self._static_source_rate()
         dyn = None
         if self._gravel_attrition is not None:
             from fluvtree.common.gravel_attrition import dynamic_source
@@ -96,10 +110,11 @@ class GravelBed(DiffusionProcess):
     ``uplift`` (rate, +up / -subsidence) turns on tectonic forcing."""
 
     def __init__(self, network=None, D=None, tol=1.0e-4, niter=None,
-                 gravel_attrition=None, uplift=None, **closure_kwargs):
+                 gravel_attrition=None, uplift=None, source_sink=None,
+                 **closure_kwargs):
         super().__init__(network, GravelClosure(D=D, **closure_kwargs),
                          tol=tol, niter=niter, gravel_attrition=gravel_attrition,
-                         uplift=uplift)
+                         uplift=uplift, source_sink=source_sink)
 
 
 class SandBed(DiffusionProcess):
@@ -111,8 +126,9 @@ class SandBed(DiffusionProcess):
     ``uplift`` (rate, +up / -subsidence) turns on tectonic forcing."""
 
     def __init__(self, network=None, D=None, n=None, tau_crit_bank=None,
-                 tol=1.0e-4, niter=None, uplift=None, **closure_kwargs):
+                 tol=1.0e-4, niter=None, uplift=None, source_sink=None,
+                 **closure_kwargs):
         super().__init__(
             network,
             SandClosure(D=D, n=n, tau_crit_bank=tau_crit_bank, **closure_kwargs),
-            tol=tol, niter=niter, uplift=uplift)
+            tol=tol, niter=niter, uplift=uplift, source_sink=source_sink)
