@@ -58,11 +58,12 @@ class DiffusionProcess(Process):
     writes = ("z",)
 
     def __init__(self, network=None, closure=None, tol=1.0e-4, niter=None,
-                 gravel_attrition=None):
+                 gravel_attrition=None, uplift=None):
         self.closure = closure
         self._tol = None if niter is not None else tol
         self._niter = 3 if niter is None else int(niter)
         self._gravel_attrition = gravel_attrition
+        self._uplift = uplift
         self.solver = None
         super().__init__(network)
 
@@ -72,6 +73,10 @@ class DiffusionProcess(Process):
     def step(self, dt, nt=1):
         """Advance the long profile ``nt`` steps of ``dt`` [s], in place on the graph."""
         self._require_bound()
+        source_rate = None
+        if self._uplift is not None:
+            from fluvtree.common.tectonics import uplift_rate
+            source_rate = uplift_rate(self.network, self._uplift)
         dyn = None
         if self._gravel_attrition is not None:
             from fluvtree.common.gravel_attrition import dynamic_source
@@ -79,7 +84,7 @@ class DiffusionProcess(Process):
                                  intermittency=self.solver.intermittency,
                                  sinuosity=self.solver.sinuosity)
         self.solver.evolve(nt=nt, dt=dt, niter=self._niter, tol=self._tol,
-                           dynamic_source=dyn)
+                           source_rate=source_rate, dynamic_source=dyn)
 
 
 class GravelBed(DiffusionProcess):
@@ -87,12 +92,14 @@ class GravelBed(DiffusionProcess):
 
     Thin preset over :class:`DiffusionProcess` with a :class:`GravelClosure`. Grain
     size ``D`` is optional (needed only to resolve width/depth, not to evolve).
-    ``gravel_attrition`` (fractional load loss per km) turns on Sternberg fining."""
+    ``gravel_attrition`` (fractional load loss per km) turns on Sternberg fining;
+    ``uplift`` (rate, +up / -subsidence) turns on tectonic forcing."""
 
     def __init__(self, network=None, D=None, tol=1.0e-4, niter=None,
-                 gravel_attrition=None, **closure_kwargs):
+                 gravel_attrition=None, uplift=None, **closure_kwargs):
         super().__init__(network, GravelClosure(D=D, **closure_kwargs),
-                         tol=tol, niter=niter, gravel_attrition=gravel_attrition)
+                         tol=tol, niter=niter, gravel_attrition=gravel_attrition,
+                         uplift=uplift)
 
 
 class SandBed(DiffusionProcess):
@@ -100,11 +107,12 @@ class SandBed(DiffusionProcess):
 
     Thin preset over :class:`DiffusionProcess` with a :class:`SandClosure`. Requires
     grain size ``D``, Manning's ``n``, and the critical bank stress
-    ``tau_crit_bank``. Use a sloped initial ``z`` (sand is singular at ``S=0``)."""
+    ``tau_crit_bank``. Use a sloped initial ``z`` (sand is singular at ``S=0``).
+    ``uplift`` (rate, +up / -subsidence) turns on tectonic forcing."""
 
     def __init__(self, network=None, D=None, n=None, tau_crit_bank=None,
-                 tol=1.0e-4, niter=None, **closure_kwargs):
+                 tol=1.0e-4, niter=None, uplift=None, **closure_kwargs):
         super().__init__(
             network,
             SandClosure(D=D, n=n, tau_crit_bank=tau_crit_bank, **closure_kwargs),
-            tol=tol, niter=niter)
+            tol=tol, niter=niter, uplift=uplift)

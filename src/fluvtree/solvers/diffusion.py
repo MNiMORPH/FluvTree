@@ -354,7 +354,8 @@ class DiffusionSolver(object):
         for si, s in enumerate(self._segs):
             self.network.set_segment_field(s, "z", Z[si].copy())
 
-    def evolve(self, nt, dt, niter=3, tol=None, max_iter=100, dynamic_source=None):
+    def evolve(self, nt, dt, niter=3, tol=None, max_iter=100,
+               source_rate=None, dynamic_source=None):
         """
         Advance ``nt`` BDF2 steps of ``dt`` [s], writing ``z`` back to the network.
 
@@ -371,22 +372,31 @@ class DiffusionSolver(object):
         comparable to GRLP's ``set_niter``); with ``tol`` set it iterates to
         ``max|z_k - z_{k-1}| < tol`` (``max_iter`` is the safety cap).
 
+        ``source_rate`` (optional) is a *static* per-segment source rate [m/s] added
+        to the bed evolution -- e.g. tectonic uplift/subsidence, which is a source in
+        the mass balance (as in GRLP's ``set_uplift_rate``). Per-segment list, or a
+        scalar broadcast to all nodes.
+
         ``dynamic_source`` (optional) is the hook for state-dependent source/sink
         physics -- e.g. gravel attrition, whose fining sink depends on ``Q_s`` and so
         must relinearize each iterate. It is called ``dynamic_source(z)`` every
         Picard iterate with the current per-segment elevation and returns a list of
         per-segment rates [m/s] added to the source term (as in GRLP's
-        ``update_gravel_loss``). Default ``None`` -- off, the common-module opt-in.
+        ``update_gravel_loss``). Both default ``None`` -- off, the common-module opt-in.
         """
         nseg = len(self._segs)
         C0 = self._C0_per_dt * dt
-        # per-node source (m/s) -> elevation increment; optional "source" field.
+        # static per-node source (m/s): the optional graph "source" field, plus the
+        # optional source_rate argument (scalar broadcast or per-segment).
         src_rate = []
-        for s in self._segs:
+        for si, s in enumerate(self._segs):
             try:
                 r = np.asarray(self.network.get_segment_field(s, "source"), float)
             except KeyError:
                 r = 0.0
+            if source_rate is not None:
+                r = r + (source_rate if np.isscalar(source_rate)
+                         else np.asarray(source_rate[si], float))
             src_rate.append(r)
         Z = self._pull_z()
         for _ in range(int(nt)):
