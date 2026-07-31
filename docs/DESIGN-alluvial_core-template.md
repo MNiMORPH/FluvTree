@@ -6,16 +6,16 @@ clean, minimal structure. `grlp`/`srlp` stay **external** validation oracles, ne
 vendored.
 
 Outcome: `fluvtree/solvers/diffusion.py` (`DiffusionSolver`) walks the shared
-`RiverNetwork` directly and reproduces external `grlp` bit-for-bit in backward
-Euler (~1e-13) on a chain, a 1-into-1 series, and a multi-tributary confluence, and
-matches `srlp`'s steady state; `fluvtree/closures/base.py` is the
+`RiverNetwork` directly and reproduces external `grlp` bit-for-bit in its default
+**BDF2** scheme (~1e-12) on a chain, a 1-into-1 series, and a multi-tributary
+confluence, and matches `srlp`'s steady state; `fluvtree/closures/base.py` is the
 `TransportClosure` interface only, with concrete closures in `fluvtree/closures/gravel.py` / `sand.py`. The 2258-line vendored engine is gone; `fluvtree.solvers.diffusion` depends on
-`numpy` + `scipy.sparse` alone. It integrates in backward Euler with constant `B`.
-**Fidelity note (2026-07-31): this is currently an *unfaithful* port.** GRLP's
-default is BDF2 + iterate-to-convergence; BDF2 and the Sternberg gravel-abrasion
-sink are not ported and were mis-framed here as "later add-ons" — they are
-GRLP-parity gaps to close, not a designed scope (see "GRLP-parity gaps" below).
-The rest of this note is the as-built design.
+`numpy` + `scipy.sparse` alone. It integrates in **BDF2** (GRLP's default,
+second-order, self-started) with constant `B`, iterate-to-convergence Picard.
+**History (2026-07-31): BDF2 was initially dropped and mis-framed as a "later
+add-on"; Andy caught it, and BDF2 was then ported and validated bit-for-bit vs
+grlp's BDF2.** Remaining GRLP gaps: the Sternberg gravel-abrasion sink and dynamic
+`B` (see "GRLP-parity gaps" below). The rest of this note is the as-built design.
 
 ## What it is
 
@@ -57,9 +57,8 @@ a core edit.
   - Picard-iterate to convergence (nonlinear coefficient relinearizes on the
     current iterate).
 - `engine.py` (thin) -- orchestration: step / evolve `nt` steps, time integration
-  (backward Euler; BDF2 is GRLP's default and is not yet ported -- a fidelity gap,
-  see "GRLP-parity gaps"), reading reach state from the shared `network` and
-  writing `z` back.
+  (**BDF2**, GRLP's default second-order scheme, self-started), reading reach state
+  from the shared `network` and writing `z` back.
 
 ## Surgically lifted from GRLP (the hard-won, validated pieces)
 
@@ -101,11 +100,12 @@ diagnostics if wanted); the dozens of `set_*` user setters; the redundant
 these and this note mis-framed them as "later"; they are fidelity gaps to close for
 a faithful port:**
 
-- **BDF2** — GRLP's *default* time integration; restore as FluvTree's default.
-  Constant-`B` BDF2 needs only the three-level time term (`time_diag = 3/2`, RHS
-  history `2 zⁿ − ½ zⁿ⁻¹`) + one extra history level; no volume-first required.
+- **BDF2** — GRLP's default 2nd-order time integration. ✅ **DONE (2026-07-31):**
+  ported (three-level term `time_diag = 3/2`, history `2 zⁿ − ½ zⁿ⁻¹`; variable-step
+  weights via `omega = dt/dt_prev`; self-started; history persisted across `evolve`
+  calls) and now the default; validated bit-for-bit vs grlp's BDF2 on transients.
 - **Sternberg gravel abrasion / downstream fining**, and the full source-term set
-  (`ssd`, uplift `U`) wired through the processes.
+  (`ssd`, uplift `U`) wired through the processes. *(still open)*
 
 **Genuinely later (separate work, or the modeller's call):**
 
@@ -118,10 +118,10 @@ a faithful port:**
 ## Port spec (execution guide for the solver lift)
 
 Lift the assembly *math* from the vendored GRLP solver (`grlp@366fb3e`,
-`grlp/solver.py`), written fresh onto the shared `network` + closure. Scope actually
-lifted: **backward Euler, constant B** (so the volume-first transform is identity,
-`J = 1`) — a *subset* of GRLP. BDF2 (GRLP's default) and the abrasion sink were NOT
-lifted; those are the GRLP-parity gaps above, not a planned phasing.
+`grlp/solver.py`), written fresh onto the shared `network` + closure. Scope lifted:
+the spatial assembly + **BDF2** (GRLP's default; ported 2026-07-31, constant `B` so
+the volume-first transform is identity, `J = 1`). Still not lifted: the Sternberg
+abrasion sink and dynamic-`B` / volume-first (the GRLP-parity gaps above).
 
 Per-reach inputs needed by the solver (build from `network` reach fields + closure):
 `x, z, Q, B`; `C0 = closure.k_Qs * I * dt / ((1 - lambda_p) * sinuosity**p)`;
@@ -150,8 +150,9 @@ Picard: freeze `RHS` at start-of-step `z`; recompute `C1` (via `S`) on the curre
 iterate each pass; iterate to `max|z_k - z_{k-1}| < tol`. Solve the sparse system
 each pass (`scipy.sparse.linalg.spsolve`).
 
-Validate against `grlp` in **euler** scheme (backward Euler + fixed 3 Picard;
-`tests/network_helpers.apply_scheme("euler")`) so the time integration matches.
+Validate against `grlp` in its default **BDF2** scheme (`set_time_integration(2)` +
+fixed 3 Picard) on a genuine transient, advancing in one `nt` call so grlp's
+two-level history engages, so the time integration matches bit-for-bit.
 Steady state is scheme-independent, so `grlp`(bdf2) and `srlp` steady states also
 work as oracles.
 

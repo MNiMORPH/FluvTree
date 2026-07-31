@@ -28,15 +28,15 @@ boundaries -- is lifted from GRLP's validated network solver (``grlp@366fb3e``)
 and reproduces it bit-for-bit. Only the data *access* is rewritten onto the shared
 network.
 
-Time integration is **backward Euler**, and ``B`` is constant. Picard iteration
-relinearizes the nonlinear conductance on the current iterate while the
-right-hand-side history is frozen at the start-of-step elevation.
+Time integration is **second-order BDF2** (as in GRLP), self-started with one
+lower-order step; ``B`` is constant. Picard iteration relinearizes the nonlinear
+conductance on the current iterate while the right-hand-side history is frozen at
+the step's start.
 
-Known gaps from GRLP (not yet ported -- fidelity gaps to close, not design
-choices): GRLP's *default* is BDF2 (2nd-order in time), so out of the box this is
-a lower-order integrator than GRLP; the volume-first transform (for
-spatially/temporally varying ``B``) and the Sternberg gravel-abrasion /
-downstream-fining sink are also not implemented.
+Not yet ported from GRLP (both additive; neither affects the constant-``B`` BDF2
+solve): the Sternberg gravel-abrasion / downstream-fining sink, and the
+volume-first transform for spatially/temporally varying ``B`` (dynamic valley
+width).
 """
 
 import warnings
@@ -130,6 +130,12 @@ class DiffusionSolver(object):
         self._C0_per_dt = (closure.k_Qs * self.intermittency
                            / ((1.0 - self.lambda_p) * self.sinuosity ** self.p))
 
+        # Two-level BDF2 history, persisted across evolve() calls so the scheme
+        # engages even when the scheduler advances one step at a time. None until
+        # the solver has taken its self-starting first step.
+        self._zold2 = None      # z^{n-1}
+        self._dt_prev = None    # the previous step's dt (for variable-step weights)
+
     # ------------------------------------------------------------------ #
     # One-time setup
     # ------------------------------------------------------------------ #
@@ -190,13 +196,14 @@ class DiffusionSolver(object):
         return (C0 * Q * (np.abs(z_up - z_down) / L_face) ** self.p_conductance
                 / L_face)
 
-    def _assemble(self, Z, dt, C0, src):
+    def _assemble(self, Z, dt, C0, src, time_diag):
         """Build the global sparse LHS and RHS for one Picard iterate.
 
-        ``Z`` is the current-iterate elevation (list of per-segment arrays); the
-        RHS history ``src`` already includes the frozen start-of-step elevation
-        plus source terms. Backward Euler, constant B: the time-diagonal is 1 and
-        the volume-first transform is the identity, so it is omitted."""
+        ``Z`` is the current-iterate elevation (list of per-segment arrays); ``src``
+        is the frozen right-hand-side history (the BDF2 elevation history plus
+        source terms) and ``time_diag`` is the time-derivative diagonal (3/2 for
+        uniform BDF2, the variable-step value otherwise, 1 for the startup step).
+        Constant B, so the volume-first transform is the identity and is omitted."""
         starts, lengths = self._starts, self._lengths
         n = self._n
         p, twop = self.p, 2.0 * self.p
@@ -232,7 +239,7 @@ class DiffusionSolver(object):
                         rows.append(g); cols.append(upg)
                         vals.append(-cond_up / A)
                     rows.append(g); cols.append(g)
-                    vals.append(1.0 + cond_sum / A)
+                    vals.append(time_diag + cond_sum / A)
                     RHS[g] = src[si][i]
                     continue
                 if down_is_confluence:
@@ -249,7 +256,7 @@ class DiffusionSolver(object):
                     rows.append(g); cols.append(downg)
                     vals.append(-cond_downseg / land)
                     rows.append(g); cols.append(g)
-                    vals.append(1.0 + (cond_up + cond_downseg) / land)
+                    vals.append(time_diag + (cond_up + cond_downseg) / land)
                     RHS[g] = src[si][i]
                     continue
                 if up_is_confluence:
@@ -263,7 +270,7 @@ class DiffusionSolver(object):
                     rows.append(g); cols.append(g + 1)
                     vals.append(-cond_down / land)
                     rows.append(g); cols.append(g)
-                    vals.append(1.0 + (cond_up + cond_down) / land)
+                    vals.append(time_diag + (cond_up + cond_down) / land)
                     RHS[g] = src[si][i]
                     continue
 
@@ -309,7 +316,7 @@ class DiffusionSolver(object):
                 dQ_2c = Q_down - Q_up
                 S = np.abs(z_down - z_up) / dx_2c
                 C1 = C0 * S ** self.p_conductance * Q[i] / B[i]
-                center = -C1 / dx_2c * (twop * (-1 / dx_up - 1 / dx_down)) + 1.0
+                center = -C1 / dx_2c * (twop * (-1 / dx_up - 1 / dx_down)) + time_diag
                 left = -C1 / dx_2c * (twop / dx_up - dQ_2c / Q[i] / dx_2c)
                 right = -C1 / dx_2c * (twop / dx_down + dQ_2c / Q[i] / dx_2c)
                 rhs_g = src[si][i]
@@ -349,14 +356,22 @@ class DiffusionSolver(object):
 
     def evolve(self, nt, dt, niter=3, tol=None, max_iter=100):
         """
-        Advance ``nt`` steps of ``dt`` [s], writing ``z`` back to the network.
+        Advance ``nt`` BDF2 steps of ``dt`` [s], writing ``z`` back to the network.
+
+        Time integration is **second-order BDF2** (as in GRLP), self-started with a
+        single lower-order step the first time the solver runs -- a two-step method
+        has no prior state to reach back to. The two-level history persists across
+        ``evolve`` calls, so BDF2 engages from the second step onward even when the
+        scheduler advances one step at a time; variable steps are exact (the weights
+        use ``omega = dt / dt_prev``).
 
         Picard iteration relinearizes the nonlinear conductance on the current
-        iterate while the RHS history is frozen at the start-of-step elevation.
-        With ``tol=None`` (default) it runs a fixed ``niter`` iterations per step
-        (bit-for-bit comparable to GRLP's ``set_niter``); with ``tol`` set it
-        iterates to ``max|z_k - z_{k-1}| < tol`` (``max_iter`` is the safety cap).
+        iterate while the RHS history is frozen at the step's start. With
+        ``tol=None`` (default) it runs a fixed ``niter`` iterations (bit-for-bit
+        comparable to GRLP's ``set_niter``); with ``tol`` set it iterates to
+        ``max|z_k - z_{k-1}| < tol`` (``max_iter`` is the safety cap).
         """
+        nseg = len(self._segs)
         C0 = self._C0_per_dt * dt
         # per-node source (m/s) -> elevation increment; optional "source" field.
         src_rate = []
@@ -368,16 +383,24 @@ class DiffusionSolver(object):
             src_rate.append(r)
         Z = self._pull_z()
         for _ in range(int(nt)):
-            zold = [zi.copy() for zi in Z]
-            src = [zold[si] + src_rate[si] * dt for si in range(len(self._segs))]
+            zold = [zi.copy() for zi in Z]              # z^n, frozen for this step
+            if self._zold2 is not None:                 # BDF2: three-level history
+                w = dt / self._dt_prev
+                b, c = 1.0 + w, w * w / (1.0 + w)
+                time_diag = (1.0 + 2.0 * w) / (1.0 + w)
+                z_rhs = [b * zold[si] - c * self._zold2[si] for si in range(nseg)]
+            else:                                       # self-start: one Euler step
+                time_diag = 1.0
+                z_rhs = zold
+            src = [z_rhs[si] + src_rate[si] * dt for si in range(nseg)]
             converged = tol is None
             cap = int(niter) if tol is None else int(max_iter)
             change = 0.0
             for _k in range(cap):
-                LHS, RHS = self._assemble(Z, dt, C0, src)
+                LHS, RHS = self._assemble(Z, dt, C0, src, time_diag)
                 out = spsolve(LHS, RHS)
                 change = 0.0
-                for si in range(len(self._segs)):
+                for si in range(nseg):
                     znew = out[self._starts[si]:self._starts[si] + self._lengths[si]]
                     if tol is not None:
                         change = max(change, float(np.max(np.abs(znew - Z[si]))))
@@ -390,6 +413,8 @@ class DiffusionSolver(object):
                     "Picard did not converge to tol=%g in %d iterations "
                     "(last change %g m); result may be under-converged."
                     % (tol, max_iter, change), RuntimeWarning)
+            self._zold2 = zold                          # z^{n-1} for the next step
+            self._dt_prev = dt
         self._push_z(Z)
         # advance the network clock, as the scheduler expects
         self.network.graph.graph["t"] = \

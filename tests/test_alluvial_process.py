@@ -41,18 +41,20 @@ def test_gravel_process_matches_external_grlp_process():
     pytest.importorskip("grlp")
     from fluvtree.processes import GRLP
 
-    # Compare like scheme to like: the in-tree solver is backward Euler (v1), so
-    # configure external grlp for backward Euler with the same fixed Picard count.
-    def _be(g):
-        g.set_time_integration(1)
+    # Both run GRLP's default scheme -- BDF2 -- with the same fixed Picard count.
+    # Advance in a single nt=6 call so GRLP's two-level history engages (it resets
+    # per evolve call; our solver persists history across calls but a fresh solver
+    # self-starts its first step identically). This is a genuine transient (the
+    # network starts off its steady state), so it actually exercises BDF2.
+    def _bdf2(g):
+        g.set_time_integration(2)
         g.set_niter(3)
 
     rn_ext, rn_in = _gravel_rn(), _gravel_rn()
-    p_ext = GRLP(rn_ext, configure=_be)
-    p_in = GravelBed(rn_in, niter=3)
-    for _ in range(6):
-        p_ext.step(3.15e10)
-        p_in.step(3.15e10)
+    p_ext = GRLP(rn_ext, configure=_bdf2)
+    p_in = GravelBed(rn_in, niter=3)          # BDF2 is the default
+    p_ext.step(3.15e10, nt=6)
+    p_in.step(3.15e10, nt=6)
     for s in rn_in.segment_ids:
         assert np.allclose(rn_ext.get_segment_field(s, "z"),
                            rn_in.get_segment_field(s, "z"), rtol=0, atol=1e-9)
