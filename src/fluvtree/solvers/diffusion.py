@@ -354,7 +354,7 @@ class DiffusionSolver(object):
         for si, s in enumerate(self._segs):
             self.network.set_segment_field(s, "z", Z[si].copy())
 
-    def evolve(self, nt, dt, niter=3, tol=None, max_iter=100):
+    def evolve(self, nt, dt, niter=3, tol=None, max_iter=100, dynamic_source=None):
         """
         Advance ``nt`` BDF2 steps of ``dt`` [s], writing ``z`` back to the network.
 
@@ -370,6 +370,13 @@ class DiffusionSolver(object):
         ``tol=None`` (default) it runs a fixed ``niter`` iterations (bit-for-bit
         comparable to GRLP's ``set_niter``); with ``tol`` set it iterates to
         ``max|z_k - z_{k-1}| < tol`` (``max_iter`` is the safety cap).
+
+        ``dynamic_source`` (optional) is the hook for state-dependent source/sink
+        physics -- e.g. gravel attrition, whose fining sink depends on ``Q_s`` and so
+        must relinearize each iterate. It is called ``dynamic_source(z)`` every
+        Picard iterate with the current per-segment elevation and returns a list of
+        per-segment rates [m/s] added to the source term (as in GRLP's
+        ``update_gravel_loss``). Default ``None`` -- off, the common-module opt-in.
         """
         nseg = len(self._segs)
         C0 = self._C0_per_dt * dt
@@ -392,11 +399,19 @@ class DiffusionSolver(object):
             else:                                       # self-start: one Euler step
                 time_diag = 1.0
                 z_rhs = zold
-            src = [z_rhs[si] + src_rate[si] * dt for si in range(nseg)]
+            # static part of the RHS history + source (frozen for the step); the
+            # dynamic source (if any) is added inside the Picard loop, recomputed
+            # on the current iterate.
+            static_src = [z_rhs[si] + src_rate[si] * dt for si in range(nseg)]
             converged = tol is None
             cap = int(niter) if tol is None else int(max_iter)
             change = 0.0
             for _k in range(cap):
+                if dynamic_source is not None:
+                    dyn = dynamic_source(Z)
+                    src = [static_src[si] + dyn[si] * dt for si in range(nseg)]
+                else:
+                    src = static_src
                 LHS, RHS = self._assemble(Z, dt, C0, src, time_diag)
                 out = spsolve(LHS, RHS)
                 change = 0.0

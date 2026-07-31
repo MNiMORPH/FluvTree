@@ -104,8 +104,13 @@ a faithful port:**
   ported (three-level term `time_diag = 3/2`, history `2 zⁿ − ½ zⁿ⁻¹`; variable-step
   weights via `omega = dt/dt_prev`; self-started; history persisted across `evolve`
   calls) and now the default; validated bit-for-bit vs grlp's BDF2 on transients.
-- **Sternberg gravel abrasion / downstream fining**, and the full source-term set
-  (`ssd`, uplift `U`) wired through the processes. *(still open)*
+- **Sternberg gravel abrasion / downstream fining** — ✅ **DONE (2026-07-31):**
+  `fluvtree.common.gravel_attrition` (optional, opt-in: `compute_Q_s` + the fining
+  sink, applied via the solver's per-Picard-iterate dynamic-source hook), validated
+  bit-for-bit vs GRLP's `update_gravel_loss`. *Still open:* the full source-term set
+  (`ssd`, uplift `U`) wired ergonomically through the processes — the generic
+  `source` field and the dynamic-source hook exist, but there is no `add`-time
+  uplift/ssd parameter yet.
 
 **Genuinely later (separate work, or the modeller's call):**
 

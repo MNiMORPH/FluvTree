@@ -48,15 +48,21 @@ class DiffusionProcess(Process):
     niter : int, optional
         Fixed number of Picard iterations per step instead of iterating to ``tol``
         (matches GRLP's ``set_niter``; useful for bit-for-bit comparison).
+    gravel_attrition : float, optional
+        Turn on Sternberg downstream fining of the gravel load: the fractional load
+        loss per km (``fluvtree.common.gravel_attrition``). Off by default. The
+        fining sink relinearizes each Picard iterate.
     """
 
     reads = ("x", "z", "Q", "B", "S0", "x_bl", "z_bl")
     writes = ("z",)
 
-    def __init__(self, network=None, closure=None, tol=1.0e-4, niter=None):
+    def __init__(self, network=None, closure=None, tol=1.0e-4, niter=None,
+                 gravel_attrition=None):
         self.closure = closure
         self._tol = None if niter is not None else tol
         self._niter = 3 if niter is None else int(niter)
+        self._gravel_attrition = gravel_attrition
         self.solver = None
         super().__init__(network)
 
@@ -66,18 +72,27 @@ class DiffusionProcess(Process):
     def step(self, dt, nt=1):
         """Advance the long profile ``nt`` steps of ``dt`` [s], in place on the graph."""
         self._require_bound()
-        self.solver.evolve(nt=nt, dt=dt, niter=self._niter, tol=self._tol)
+        dyn = None
+        if self._gravel_attrition is not None:
+            from fluvtree.common.gravel_attrition import dynamic_source
+            dyn = dynamic_source(self.network, self.closure, self._gravel_attrition,
+                                 intermittency=self.solver.intermittency,
+                                 sinuosity=self.solver.sinuosity)
+        self.solver.evolve(nt=nt, dt=dt, niter=self._niter, tol=self._tol,
+                           dynamic_source=dyn)
 
 
 class GravelBed(DiffusionProcess):
     """Gravel-bed long-profile process (noncohesive banks, no form drag).
 
     Thin preset over :class:`DiffusionProcess` with a :class:`GravelClosure`. Grain
-    size ``D`` is optional (needed only to resolve width/depth, not to evolve)."""
+    size ``D`` is optional (needed only to resolve width/depth, not to evolve).
+    ``gravel_attrition`` (fractional load loss per km) turns on Sternberg fining."""
 
-    def __init__(self, network=None, D=None, tol=1.0e-4, niter=None, **closure_kwargs):
+    def __init__(self, network=None, D=None, tol=1.0e-4, niter=None,
+                 gravel_attrition=None, **closure_kwargs):
         super().__init__(network, GravelClosure(D=D, **closure_kwargs),
-                         tol=tol, niter=niter)
+                         tol=tol, niter=niter, gravel_attrition=gravel_attrition)
 
 
 class SandBed(DiffusionProcess):
