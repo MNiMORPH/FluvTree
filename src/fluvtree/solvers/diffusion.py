@@ -33,10 +33,12 @@ lower-order step; ``B`` is constant. Picard iteration relinearizes the nonlinear
 conductance on the current iterate while the right-hand-side history is frozen at
 the step's start.
 
-Not yet ported from GRLP (both additive; neither affects the constant-``B`` BDF2
-solve): the Sternberg gravel-abrasion / downstream-fining sink, and the
-volume-first transform for spatially/temporally varying ``B`` (dynamic valley
-width).
+The Sternberg gravel-abrasion / downstream-fining sink *is* ported: it enters
+through the optional per-iterate ``dynamic_source`` hook (see
+``fluvtree.common.gravel_attrition``), additive and off by default. The one piece
+not yet ported from GRLP is the volume-first transform for spatially/temporally
+varying ``B`` (dynamic valley width); it does not affect the constant-``B`` BDF2
+solve.
 """
 
 import warnings

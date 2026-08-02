@@ -14,8 +14,10 @@ confluence, and matches `srlp`'s steady state; `fluvtree/closures/base.py` is th
 second-order, self-started) with constant `B`, iterate-to-convergence Picard.
 **History (2026-07-31): BDF2 was initially dropped and mis-framed as a "later
 add-on"; Andy caught it, and BDF2 was then ported and validated bit-for-bit vs
-grlp's BDF2.** Remaining GRLP gaps: the Sternberg gravel-abrasion sink and dynamic
-`B` (see "GRLP-parity gaps" below). The rest of this note is the as-built design.
+grlp's BDF2.** The one remaining GRLP-fidelity gap is dynamic `B` (volume-first),
+tracked as valley-realism work below; the Sternberg abrasion sink and the
+uplift/source-sink terms have since been ported. The rest of this note is the
+as-built design. (Full port inventory: `GRLP-parity-and-gaps.md`.)
 
 ## What it is
 
@@ -107,10 +109,12 @@ a faithful port:**
 - **Sternberg gravel abrasion / downstream fining** — ✅ **DONE (2026-07-31):**
   `fluvtree.common.gravel_attrition` (optional, opt-in: `compute_Q_s` + the fining
   sink, applied via the solver's per-Picard-iterate dynamic-source hook), validated
-  bit-for-bit vs GRLP's `update_gravel_loss`. *Still open:* the full source-term set
-  (`ssd`, uplift `U`) wired ergonomically through the processes — the generic
-  `source` field and the dynamic-source hook exist, but there is no `add`-time
-  uplift/ssd parameter yet.
+  bit-for-bit vs GRLP's `update_gravel_loss`.
+- **Tectonic uplift/subsidence + generic distributed source/sink** — ✅ **DONE
+  (2026-08-01):** `fluvtree.common.tectonics` (`uplift=`) and the `source_sink=`
+  channel, both coupled sources (not operator-split), validated bit-for-bit vs
+  GRLP's `set_uplift_rate` / `set_source_sink_distributed` and composing together.
+  This closes GRLP's full source-term set (`U`, `ssd`, fining).
 
 **Genuinely later (separate work, or the modeller's call):**
 
@@ -125,8 +129,9 @@ a faithful port:**
 Lift the assembly *math* from the vendored GRLP solver (`grlp@366fb3e`,
 `grlp/solver.py`), written fresh onto the shared `network` + closure. Scope lifted:
 the spatial assembly + **BDF2** (GRLP's default; ported 2026-07-31, constant `B` so
-the volume-first transform is identity, `J = 1`). Still not lifted: the Sternberg
-abrasion sink and dynamic-`B` / volume-first (the GRLP-parity gaps above).
+the volume-first transform is identity, `J = 1`). Still not lifted: dynamic-`B` /
+volume-first (the one remaining GRLP-parity gap above; full inventory in
+`GRLP-parity-and-gaps.md`).
 
 Per-reach inputs needed by the solver (build from `network` reach fields + closure):
 `x, z, Q, B`; `C0 = closure.k_Qs * I * dt / ((1 - lambda_p) * sinuosity**p)`;
