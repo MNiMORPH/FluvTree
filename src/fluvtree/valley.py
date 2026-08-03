@@ -196,3 +196,28 @@ class ValleyGeometry(object):
                 "valley width above the tabulated range at %d node(s): holding the "
                 "top width constant. The valley function should be extended "
                 "(e.g. by TerraPIN)." % na, RuntimeWarning)
+
+
+class RectangularValley(object):
+    """
+    Rectangular valley: width independent of ``z`` -- the constant-``B`` default.
+
+    ``valley_width = B``, ``V = (1 - lambda_p) * B * z``: the same three primitives as
+    :class:`ValleyGeometry` but with no ``z``-dependence, reproducing the constant-``B``
+    model. As the solver's default storage geometry it makes the volume-first
+    transform an exact row-scaling (``J`` constant, ``Vcorr = 0``), so the constant-B
+    solution is unchanged. Mirrors ``grlp.Segment``'s rectangular default.
+    """
+
+    def __init__(self, B, lambda_p):
+        self.B = np.asarray(B, dtype=float)
+        self.lambda_p = float(lambda_p)
+
+    def valley_width(self, z):
+        return np.broadcast_to(self.B, np.shape(z))
+
+    def storage_jacobian(self, z):
+        return (1.0 - self.lambda_p) * self.valley_width(z)
+
+    def storage_volume(self, z):
+        return (1.0 - self.lambda_p) * self.valley_width(z) * z

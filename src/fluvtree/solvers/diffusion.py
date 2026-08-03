@@ -29,16 +29,17 @@ and reproduces it bit-for-bit. Only the data *access* is rewritten onto the shar
 network.
 
 Time integration is **second-order BDF2** (as in GRLP), self-started with one
-lower-order step; ``B`` is constant. Picard iteration relinearizes the nonlinear
-conductance on the current iterate while the right-hand-side history is frozen at
-the step's start.
+lower-order step. Picard iteration relinearizes the nonlinear conductance on the
+current iterate while the right-hand-side history is frozen at the step's start.
 
-The Sternberg gravel-abrasion / downstream-fining sink *is* ported: it enters
-through the optional per-iterate ``dynamic_source`` hook (see
-``fluvtree.common.gravel_attrition``), additive and off by default. The one piece
-not yet ported from GRLP is the volume-first transform for spatially/temporally
-varying ``B`` (dynamic valley width); it does not affect the constant-``B`` BDF2
-solve.
+The solve is **volume-first**: it conserves stored sediment volume ``V``, not bed
+elevation ``z``, and recovers ``z`` through a valley-storage geometry (see
+``fluvtree.valley``). The default rectangular valley (constant ``B``) makes the
+transform an exact row-scaling that reproduces the constant-``B`` model; a
+``ValleyGeometry`` with a ``z``-varying width gives a genuine dynamic-``B`` solve
+that conserves volume and stays second-order. The Sternberg gravel-abrasion /
+downstream-fining sink enters through the optional per-iterate ``dynamic_source``
+hook (``fluvtree.common.gravel_attrition``), additive and off by default.
 """
 
 import warnings
@@ -46,6 +47,8 @@ import warnings
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
+
+from fluvtree.valley import RectangularValley
 
 
 class DiffusionSolver(object):
@@ -72,7 +75,8 @@ class DiffusionSolver(object):
     land areas are built once at construction. Only ``z`` changes during a solve.
     """
 
-    def __init__(self, network, closure, intermittency=1.0, sinuosity=1.0):
+    def __init__(self, network, closure, intermittency=1.0, sinuosity=1.0,
+                 geometry=None):
         self.network = network
         self.closure = closure
         self.p = float(closure.p)
@@ -131,6 +135,16 @@ class DiffusionSolver(object):
         # in the assembler). Uniform closure -> one scalar for the whole network.
         self._C0_per_dt = (closure.k_Qs * self.intermittency
                            / ((1.0 - self.lambda_p) * self.sinuosity ** self.p))
+
+        # Valley-storage geometry (general, not transport-specific): the solve
+        # conserves stored sediment volume V, not elevation z, and recovers z through
+        # this geometry. Default is a rectangular valley from the network's own B
+        # field -- constant width, so the volume-first transform is an exact
+        # row-scaling that reproduces the constant-B model. Pass a ValleyGeometry for
+        # a z-varying (dynamic-B) valley. Flat, in the global node order.
+        B_flat = np.concatenate(self.B) if self.B else np.zeros(0)
+        self.geometry = (geometry if geometry is not None
+                         else RectangularValley(B_flat, self.lambda_p))
 
         # Two-level BDF2 history, persisted across evolve() calls so the scheme
         # engages even when the scheduler advances one step at a time. None until
@@ -198,14 +212,19 @@ class DiffusionSolver(object):
         return (C0 * Q * (np.abs(z_up - z_down) / L_face) ** self.p_conductance
                 / L_face)
 
-    def _assemble(self, Z, dt, C0, src, time_diag):
+    def _assemble(self, Z, dt, C0, src, time_diag, z_hist, Vhist):
         """Build the global sparse LHS and RHS for one Picard iterate.
 
         ``Z`` is the current-iterate elevation (list of per-segment arrays); ``src``
-        is the frozen right-hand-side history (the BDF2 elevation history plus
-        source terms) and ``time_diag`` is the time-derivative diagonal (3/2 for
-        uniform BDF2, the variable-step value otherwise, 1 for the startup step).
-        Constant B, so the volume-first transform is the identity and is omitted."""
+        is the frozen right-hand-side history (the elevation history plus source
+        terms) and ``time_diag`` is the time-derivative diagonal (3/2 for uniform
+        BDF2, the variable-step value otherwise, 1 for the startup step).
+
+        The elevation system is assembled first, then row-scaled by the storage
+        Jacobian ``J = dV/dz`` and its RHS history swapped into volume space (the
+        volume-first transform): ``z_hist`` is the flat elevation history already
+        folded into ``src`` (subtracted off so only sources/boundaries are scaled),
+        and ``Vhist`` is the matching flat V-space history from the caller."""
         starts, lengths = self._starts, self._lengths
         n = self._n
         p, twop = self.p, 2.0 * self.p
@@ -339,7 +358,21 @@ class DiffusionSolver(object):
                     rows.append(g); cols.append(down_g)
                     vals.append(right)
                 RHS[g] = rhs_g
+        # Volume-first transform: conserve stored sediment volume V, not elevation z.
+        # Row-scale the elevation system by the storage Jacobian J = dV/dz at the
+        # iterate, and carry the RHS history in V-space with the nonlinear-map
+        # correction Vcorr = time_diag*(J*z - V(z)). RHS - z_hist is the non-history
+        # part (sources + boundary terms), which scales by J; the history becomes
+        # Vhist. Rectangular valley: J constant, Vcorr = 0, Vhist = J*z_hist -> an
+        # exact row-scaling (constant-B solution unchanged). A z-varying valley makes
+        # it a genuine change that conserves volume and keeps BDF2 second-order.
+        Z_flat = np.concatenate(Z)
+        Jstore = self.geometry.storage_jacobian(Z_flat)
+        Vcorr = time_diag * (Jstore * Z_flat - self.geometry.storage_volume(Z_flat))
+        rows = np.asarray(rows)
+        vals = np.asarray(vals) * Jstore[rows]
         LHS = sparse.csr_matrix((vals, (rows, cols)), shape=(n, n))
+        RHS = Vhist + Vcorr + Jstore * (RHS - z_hist)
         return LHS, RHS
 
     # ------------------------------------------------------------------ #
@@ -408,9 +441,16 @@ class DiffusionSolver(object):
                 b, c = 1.0 + w, w * w / (1.0 + w)
                 time_diag = (1.0 + 2.0 * w) / (1.0 + w)
                 z_rhs = [b * zold[si] - c * self._zold2[si] for si in range(nseg)]
+                # V-space history: V is nonlinear in z, so difference the volumes,
+                # not the elevations (b V^n - c V^{n-1}).
+                Vhist = (b * self.geometry.storage_volume(np.concatenate(zold))
+                         - c * self.geometry.storage_volume(
+                             np.concatenate(self._zold2)))
             else:                                       # self-start: one Euler step
                 time_diag = 1.0
                 z_rhs = zold
+                Vhist = self.geometry.storage_volume(np.concatenate(zold))
+            z_hist = np.concatenate(z_rhs)              # flat elevation history
             # static part of the RHS history + source (frozen for the step); the
             # dynamic source (if any) is added inside the Picard loop, recomputed
             # on the current iterate.
@@ -424,7 +464,7 @@ class DiffusionSolver(object):
                     src = [static_src[si] + dyn[si] * dt for si in range(nseg)]
                 else:
                     src = static_src
-                LHS, RHS = self._assemble(Z, dt, C0, src, time_diag)
+                LHS, RHS = self._assemble(Z, dt, C0, src, time_diag, z_hist, Vhist)
                 out = spsolve(LHS, RHS)
                 change = 0.0
                 for si in range(nseg):
