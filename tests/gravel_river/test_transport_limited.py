@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 
 from topologies import SPECS, widths, S0, Z_BL
-from fluvtree.processes import build_grlp_network, Rule, TransportLimitedRate
+from fluvtree.processes import build_network, Rule, TransportLimitedRate
 
 _REF = np.load(os.path.join(os.path.dirname(__file__), "reference.npz"))
 
@@ -38,7 +38,7 @@ def _golden_segments(name):
 
 
 def _fluvtree_network(spec, z_init):
-    return build_grlp_network(
+    return build_network(
         spec["up"], spec["down"], spec["x"], z_init, spec["Q"],
         widths(spec), S0, spec["x_bl"], Z_BL)
 

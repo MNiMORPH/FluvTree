@@ -75,6 +75,46 @@ class RiverNetwork(object):
             G.add_edge(u, v, seg=s)
         return cls(G)
 
+    @classmethod
+    def from_arrays(cls, upstream_segment_IDs, downstream_segment_IDs,
+                    x, z, Q, B, S0, x_bl, z_bl, Q_s_0=None):
+        """
+        Construct a network from explicit per-segment arrays and boundary values.
+
+        The topology comes from the upstream/downstream ID lists (as in
+        :meth:`from_segment_lists`); ``x, z, Q, B`` are per-segment interior arrays
+        stamped onto the edges, and ``S0`` (a scalar applied at every channel head,
+        or one value per head in ascending head-segment-ID order), ``x_bl``/``z_bl``
+        (outlet base level), and optional network-level ``Q_s_0`` set the boundaries.
+
+        This is the *explicit* constructor: the caller provides the values. Synthetic
+        networks belong in ``fluvtree.generate``, DEM/measured loading in an ``io``
+        layer -- see docs/DESIGN-structure-and-naming.md.
+        """
+        rn = cls.from_segment_lists(upstream_segment_IDs, downstream_segment_IDs)
+        for i, s in enumerate(rn.segment_ids):
+            # copy, so the graph holds independent arrays: guards against a caller
+            # passing aliased arrays (e.g. ``[np.zeros(n)] * k``, which repeats one
+            # object) -- otherwise the reaches would share and clobber one another.
+            rn.set_segment_field(s, "x", np.array(x[i], dtype=float))
+            rn.set_segment_field(s, "z", np.array(z[i], dtype=float))
+            rn.set_segment_field(s, "Q", np.array(Q[i], dtype=float))
+            rn.set_segment_field(s, "B", np.array(B[i], dtype=float))
+        heads = sorted(rn.head_segments())
+        try:
+            iter(S0)
+            S0_per_head = list(S0)
+        except TypeError:
+            S0_per_head = [S0] * len(heads)
+        for head, _S0 in zip(heads, S0_per_head):
+            rn.set_node_field(rn.edge_of(head)[0], "S0", _S0)
+        outlet = rn.edge_of(rn.mouth_segments()[0])[1]
+        rn.set_node_field(outlet, "x_bl", x_bl)
+        rn.set_node_field(outlet, "z_bl", z_bl)
+        if Q_s_0 is not None:
+            rn.graph.graph["Q_s_0"] = Q_s_0
+        return rn
+
     # ------------------------------------------------------------------ #
     # Topology
     # ------------------------------------------------------------------ #

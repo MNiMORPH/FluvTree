@@ -29,44 +29,6 @@ from fluvtree.network import RiverNetwork
 from fluvtree.processes.base import Process
 
 
-def build_grlp_network(upstream_segment_IDs, downstream_segment_IDs,
-                       x, z, Q, B, S0, x_bl, z_bl, Q_s_0=None):
-    """
-    Build a :class:`RiverNetwork` carrying GRLP-consumable state.
-
-    ``x, z, Q, B`` are per-segment interior arrays (edge fields). ``S0`` is a
-    scalar boundary slope applied at every channel head, or one value per head in
-    ascending head-segment-ID order (matching GRLP's channel-head ordering).
-    ``x_bl``/``z_bl`` place base level at the outlet; ``Q_s_0`` is an optional
-    network-level upstream sediment supply.
-    """
-    rn = RiverNetwork.from_segment_lists(upstream_segment_IDs,
-                                         downstream_segment_IDs)
-    segs = rn.segment_ids
-    for i, s in enumerate(segs):
-        # copy, so the graph owns independent arrays: guards against a caller
-        # passing aliased arrays (e.g. ``[np.zeros(n)] * k``, which repeats one
-        # object) -- otherwise the reaches would share and clobber one another.
-        rn.set_segment_field(s, "x", np.array(x[i], dtype=float))
-        rn.set_segment_field(s, "z", np.array(z[i], dtype=float))
-        rn.set_segment_field(s, "Q", np.array(Q[i], dtype=float))
-        rn.set_segment_field(s, "B", np.array(B[i], dtype=float))
-    heads = sorted(rn.head_segments())
-    try:
-        iter(S0)
-        S0_per_head = list(S0)
-    except TypeError:
-        S0_per_head = [S0] * len(heads)
-    for head, _S0 in zip(heads, S0_per_head):
-        rn.set_node_field(rn.edge_of(head)[0], "S0", _S0)
-    outlet = rn.edge_of(rn.mouth_segments()[0])[1]
-    rn.set_node_field(outlet, "x_bl", x_bl)
-    rn.set_node_field(outlet, "z_bl", z_bl)
-    if Q_s_0 is not None:
-        rn.graph.graph["Q_s_0"] = Q_s_0
-    return rn
-
-
 class GRLP(Process):
     """
     GRLP long-profile evolution as a FluvTree process.
@@ -75,7 +37,8 @@ class GRLP(Process):
     ----------
     network : RiverNetwork, optional
         The canonical network. Must carry the fields listed in the module
-        docstring (see :func:`build_grlp_network`). Omit to bind later via a
+        docstring (see :meth:`~fluvtree.network.RiverNetwork.from_arrays`). Omit to
+        bind later via a
         :class:`FluvTree` model or :class:`Scheduler`.
     configure : callable, optional
         ``configure(grlp_network)`` called once after the internal

@@ -47,7 +47,7 @@ class TransportLimitedRate(object):
 
     Reads per-segment ``x, z, Q, B`` (edges) and the boundary fields ``S0`` (head
     nodes) and ``x_bl``/``z_bl`` (outlet node) off the graph -- the layout that
-    :func:`~fluvtree.processes.build_grlp_network` stamps. Holds the transport
+    :meth:`~fluvtree.network.RiverNetwork.from_arrays` stamps. Holds the transport
     constants as parameters.
 
     Parameters
