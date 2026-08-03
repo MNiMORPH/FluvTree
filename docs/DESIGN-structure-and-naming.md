@@ -33,17 +33,26 @@ deferred (see the frontiers note / memory).
 ```
 src/fluvtree/
   __init__.py          front door — import fluvtree as ft
-  network.py           RiverNetwork
+  network.py           RiverNetwork — topology; holds variables, does not own them.
+                       Explicit constructors: from_segment_lists, from_arrays.
+  valley.py            ValleyGeometry / RectangularValley — valley-storage B(x, z)
   model.py             FluvTree
   scheduler.py         Scheduler (the machinery inside FluvTree.run)
+  plot.py              matplotlib views — the ONLY matplotlib importer; consumes analysis
   solvers/
-    diffusion.py       DiffusionSolver   — power-law nonlinear diffusion
+    diffusion.py       DiffusionSolver   — power-law nonlinear diffusion (volume-first)
     advection.py       AdvectionSolver   — power-law nonlinear advection (n=1 rung built)
   closures/
     base.py            TransportClosure
     gravel.py          GravelClosure
     sand.py            SandClosure
   processes/           GravelBed, SandBed, StreamPower, FixedBed, Rule, GRLP
+  common/              optional opt-in shared physics: gravel_attrition, tectonics, rates
+  analysis/            derive metrics — pure numpy, returns data (plot consumes it)
+    network.py         across the network (spatial): compute_Q_s, slope_area
+    dynamics.py        in dynamics (temporal): planned — dz/dt, response times
+  generate/            planned — synthesis: arbitrary/random networks, idealized inputs
+  io/                  planned — DEM / measured loading
 scripts/               GIS utilities (setupDomain, drainageNetworkGRASS)
 tests/  docs/  pyproject.toml
 ```
@@ -84,6 +93,24 @@ tests/  docs/  pyproject.toml
    ("power-law nonlinear diffusion; flux ∝ Q·S^p") lives in the first docstring
    line. Promote precision into the identifier only when a sibling forces
    disambiguation (e.g. a future *linear* hillslope diffusion).
+
+## Analysis, views, and inputs
+
+- **Analysis is separate from plotting.** `analysis/` derives quantities from a
+  network's state and returns *data* (pure numpy); `plot.py` is the separate
+  matplotlib layer that *consumes* it. One-way: `plot → analysis`, never the
+  reverse. This is load-bearing, not stylistic — it keeps `import fluvtree`
+  matplotlib-free (subprocess-tested; `plot.py` is the sole guarded importer).
+  Analysis splits on two axes: `analysis.network` (across the network — spatial) and
+  `analysis.dynamics` (in dynamics — temporal).
+- **Input construction has three homes, by *how* the network arrives** — only one is
+  generation:
+  - *explicit* (caller provides the values) → `RiverNetwork` constructors
+    (`from_segment_lists`, `from_arrays`). Construction lives with the structure.
+  - *synthesis* (invented from parameters: arbitrary/random networks, idealized
+    profiles) → `generate/` (planned).
+  - *loading* (from data: DEM, measured sections) → `io/` (planned).
+  `build_network` is the convenience alias for `RiverNetwork.from_arrays`.
 
 ## Locked names
 
