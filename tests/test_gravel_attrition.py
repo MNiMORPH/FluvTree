@@ -12,7 +12,7 @@ import pytest
 
 from fluvtree.processes import GravelBed, build_network
 from fluvtree.closures.gravel import GravelClosure
-from fluvtree.common.gravel_attrition import compute_Q_s
+from fluvtree.analysis.network import compute_Q_s
 
 
 _D = 2000.0

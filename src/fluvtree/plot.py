@@ -19,6 +19,8 @@ schematic network map). :class:`fluvtree.model.FluvTree` has ``plot`` /
 import numpy as np
 import matplotlib.pyplot as plt
 
+from fluvtree.analysis import network as _analysis
+
 
 def long_profile(network, ax=None, color="C0", connect_baselevel=True, **kwargs):
     """
@@ -105,17 +107,7 @@ def slope_area(network, against="Q", ax=None, fit=True, **kwargs):
     """
     if ax is None:
         _, ax = plt.subplots()
-    slopes, absc = [], []
-    for s in network.segment_ids:
-        x = np.asarray(network.get_segment_field(s, "x"), float)
-        z = np.asarray(network.get_segment_field(s, "z"), float)
-        a = np.asarray(network.get_segment_field(s, against), float)
-        slopes.append(np.abs(np.diff(z) / np.diff(x)))
-        absc.append(0.5 * (a[:-1] + a[1:]))
-    S = np.concatenate(slopes)
-    A = np.concatenate(absc)
-    keep = (S > 0) & (A > 0)                 # log-log needs positives
-    S, A = S[keep], A[keep]
+    A, S = _analysis.slope_area(network, against)   # analysis computes, plot draws
     kwargs.setdefault("marker", ".")
     kwargs.setdefault("linestyle", "none")
     ax.loglog(A, S, **kwargs)
