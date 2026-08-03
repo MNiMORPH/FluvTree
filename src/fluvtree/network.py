@@ -1,25 +1,28 @@
 """
-The FluvTree network substrate: canonical topology + state, no physics.
+The FluvTree network substrate: the topology, and where variables are held on it.
 
 Extracted (not grafted) from GRLP's physics-free network machinery,
 ``grlp@366fb3e`` (v2.1.0); its history stays in GRLP. See
 docs/fluvtree-engine-architecture.md for the architecture and the reasons the
 history is not transplanted.
 
-The substrate owns the canonical state of a river network as a directed
-convergent graph:
+The network generates the *structure* of a river as a directed convergent graph
+and **holds** the variables attached to it -- it does not **own** them. Other
+modules add, remove, and modify those variables; the network is only where they
+live, keyed by the structure:
 
-- **edges are segments (reaches)** and carry along-reach *interior* arrays
+- **edges are segments (reaches)** and hold along-reach *interior* arrays
   (``x, z, Q, ...``): the reach's interior nodes;
-- **nodes are junctions** (channel heads, confluences, the outlet) and carry the
-  scalar state at that point.
+- **nodes are junctions** (channel heads, confluences, the outlet) and hold the
+  scalar values at that point.
 
 A reach's two endpoints live on the graph nodes it connects, held once and shared
 by every process that touches that junction (the "reach-assembly convention":
 ``hstack(upstream node, edge interior, downstream node)``).
 
-This module knows nothing about sediment transport. Traversal and state access
-only; a *process* (e.g. the GRLP adapter) supplies the physics.
+This module knows nothing about sediment transport and owns none of the variables
+it holds. Traversal and attach/read/remove access only; a *process* (e.g. the GRLP
+adapter) supplies the physics and owns what it places here.
 """
 
 import networkx as nx
@@ -28,7 +31,9 @@ import numpy as np
 
 class RiverNetwork(object):
     """
-    A directed convergent graph of a river network: the canonical state.
+    A directed convergent graph of a river network: the structure that variables
+    are attached to. It holds them, keyed by segment and node -- it does not own
+    them; the modules that attach a variable own it.
 
     Node identities are opaque hashables (any networkx node key). Segment
     (reach) identities are integers carried on the edges as the ``seg`` attribute,
@@ -139,11 +144,12 @@ class RiverNetwork(object):
         return out
 
     # ------------------------------------------------------------------ #
-    # State access
+    # Variable access (attach / read / remove -- the network holds, not owns)
     # ------------------------------------------------------------------ #
 
     def set_segment_field(self, seg, name, value):
-        """Store an along-reach interior array ``name`` on segment ``seg``."""
+        """Attach or modify the along-reach interior array ``name`` on segment
+        ``seg``. The caller owns the variable; the network only holds it."""
         u, v = self._edge_of[seg]
         self.graph.edges[u, v][name] = value
 
@@ -152,13 +158,23 @@ class RiverNetwork(object):
         u, v = self._edge_of[seg]
         return self.graph.edges[u, v][name]
 
+    def remove_segment_field(self, seg, name):
+        """Remove the along-reach interior array ``name`` from segment ``seg``."""
+        u, v = self._edge_of[seg]
+        del self.graph.edges[u, v][name]
+
     def set_node_field(self, node, name, value):
-        """Store a scalar ``name`` on junction ``node``."""
+        """Attach or modify the scalar ``name`` on junction ``node``. The caller
+        owns the variable; the network only holds it."""
         self.graph.nodes[node][name] = value
 
     def get_node_field(self, node, name):
         """Read a scalar ``name`` from junction ``node``."""
         return self.graph.nodes[node][name]
+
+    def remove_node_field(self, node, name):
+        """Remove the scalar ``name`` from junction ``node``."""
+        del self.graph.nodes[node][name]
 
     def reach_profile(self, seg, name):
         """
