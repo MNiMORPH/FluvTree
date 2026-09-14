@@ -75,6 +75,15 @@ that enforces them.
 Store these as flat `z`, flat `B`, plus an `offsets` index. That is exactly
 `ValleyGeometry`'s own in-memory layout, so the reader is close to a copy.
 
+**The same table serves water and sediment, at two different porosities.** A
+depression fills with water *or* with sediment through the identical `B(x, z)`
+curve; only the solid fraction differs. `ValleyGeometry` bakes `(1 - lambda_p)`
+into both `storage_volume` and `storage_jacobian` (`valley.py:149,181`), so a
+water-storage query needs the `lambda_p = 0` path. The producer therefore ships
+**one geometry and no porosity** – `lambda_p` is FluvTree's sediment parameter,
+not a property of the container, and must not be folded into the delivered
+widths.
+
 ### 2.4 Hydrology, per node
 
 11. `A` – contributing drainage area [m²].
