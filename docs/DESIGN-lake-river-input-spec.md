@@ -71,7 +71,75 @@ emits `pit_cell` (the deepest point) and `out_cell` (the sill). A depression lin
 runs from where the network enters the depression, through `pit_cell`, to
 `out_cell`.
 
-### 1.2 Making the geometry updatable without a callback
+### 1.2 Meta-depressions are groupings of links, not links
+
+`A(z)` differs through a depression, and a meta-depression's extent is its two
+children plus the ground between them. That tempts one link per hierarchy node –
+but a meta-depression link would be spatially disjoint (a piece on each side), and
+a disjoint link is no longer the contiguous `B(x, z)` object a river link is. The
+unification would break at exactly the point it is meant to hold.
+
+**Resolve it by not putting meta-depressions on the graph at all.**
+
+- **Links are cut at leaf granularity**: one contiguous depression link per leaf
+  depression, plus the ordinary river links that connect them.
+- **The hierarchy is a tree whose leaves reference links**, carried as data
+  alongside the graph. A meta-depression is then a *set* of links – "above
+  `out_elev`, links {L3, L5, L7} share one water surface" – and a set has no
+  obligation to be a single link.
+
+The gap between two merge partners is not a hole: it is the reach over the pour
+point. `dephier` records that connection explicitly – `geolink` is *"the depression
+on the other side of the pour point"* and `odep` *"the depression this one
+overflows into"*. So a meta-depression's links form a **connected subgraph**, not
+disconnected pieces.
+
+**This requires a conditioning decision, and it is load-bearing.** The drainage
+network must be extracted from a **depression-filled or breached** DEM, while the
+depression hierarchy is computed on the **original** DEM. Only then does the
+network run continuously through each basin and out over its sill, so the
+connecting reaches exist as links to be grouped. Extract the network on the raw DEM
+and flow terminates at every pit, leaving the depression links genuinely
+disconnected and this whole construction unavailable.
+
+**The storage constraint becomes hierarchical, and is free.** With §1.1 applied per
+link, for any node *D* of the tree:
+
+> Σ over links in *D*'s subtree of B(x_i, z) · Δx_i  =  A_D(z)
+
+Satisfying it at the leaves and connecting reaches satisfies it at every level
+above, **provided the extents partition** – every cell of a meta-depression belongs
+to exactly one leaf or one connecting region. That partition requirement is on the
+producer, and is the one thing that must be checked rather than assumed.
+
+### 1.3 The maximum water level is computed, not guessed
+
+§1 asks for `(z, B)` levels over a "generous" elevation range. The hierarchy makes
+that precise. Taking a **depression** to mean the top-level non-ocean-linked
+meta-depression, that node's `out_elev` is the highest water level the system can
+reach before spilling to the outlet. It is the exact upper bound for every `B(z)`
+table beneath it, and it bounds how much of the tree needs shipping: the sub-tree
+under each top-level non-ocean-linked node, and no further.
+
+### 1.4 Junction degree is a function of water level
+
+Many tributaries entering one lake is not an exception to the binary graph; it is
+the hierarchy read backwards. At high water the tributaries meet one water surface
+– an *n*-way junction. As the level drops the water body splits into sub-basins and
+the tributaries re-separate into distinct binary confluences. The depression
+hierarchy is precisely the record of which merges happen at which elevation.
+
+So: **store the finest (low-water) decomposition, and merge at run time.** The
+stored graph stays binary; FluvTree groups links into shared-surface bodies each
+step, and the hierarchy is the precomputed answer for which groups form at which
+level – a lookup, not a discovery. Tracing the tributary network to partition the
+hierarchy in advance is then unnecessary.
+
+The solver already permits the run-time result: confluence assembly sums over
+`for j in up_ids` with no cap (`diffusion.py:254`), so an *n*-way shared surface
+costs nothing.
+
+### 1.5 Making the geometry updatable without a callback
 
 The structure must support geometry that changes as the landscape evolves. Four
 cases, and three of them stay inside FluvTree:
@@ -159,9 +227,12 @@ Per depression, including ones that are dry today:
 15. `out_seg`, `out_node` – *where on the segment graph the sill sits*
 16. `dep_vol` – capacity to the sill
 17. endorheic / ocean-linked flag
-18. `A(z)` – the area–elevation curve, **for meta-depressions as well as leaves**.
-    Per §1.2 case 3, shipping the meta curves is what makes a lake merge a lookup
-    rather than a recomputation.
+18. `A(z)` – the area–elevation curve, for **every node of the tree**, leaf and
+    meta alike. It is the authoritative geometry (§1.1); the link widths are
+    derived from it. Shipping the meta curves makes a merge a lookup, and gives
+    FluvTree an independent check that the §1.2 partition holds.
+19. `odep` / `geolink` – the overflow connections, and the merge elevation per
+    tree node. These are what turn the tree into a run-time lookup (§1.4).
 
 Item 15 is the one that does not exist in any current output and is the crux of
 the join (§5): the hierarchy knows the sill as a raster cell; FluvTree needs it as
@@ -169,14 +240,14 @@ a position on a reach.
 
 ### 2.6 Boundaries
 
-19. outlet segment and node, `x_bl`, `z_bl`.
-20. per-head `S0` or a network-level `Q_s_0` (the existing
+20. outlet segment and node, `x_bl`, `z_bl`.
+21. per-head `S0` or a network-level `Q_s_0` (the existing
     `RiverNetwork.from_arrays` boundary set).
 
 ### 2.7 Georeferencing and provenance
 
-21. `x`, `y` per node, and the CRS.
-22. **Provenance block**: DEM source and resolution, computational region,
+22. `x`, `y` per node, and the CRS.
+23. **Provenance block**: DEM source and resolution, computational region,
     RichDEM / `r.richdem` versions, and **every threshold applied, with the count
     of features it kept and dropped**.
 
