@@ -38,6 +38,60 @@ a river today may be drowned tomorrow, and a lake that fills becomes a river. Ea
 node must carry enough elevation range that the *other* classification is
 representable without going back to the DEM.
 
+### 1.1 Depression links: hypsometry is authoritative, `B(x, z)` is derived
+
+Laying `B(x, z)` along a depression's deepest axis is only faithful if that axis is
+straight and the basin is prismatic about it. Real depressions are lobate, bent, or
+dendritic (a drowned valley network), so a perpendicular-width sweep along the
+thalweg will **not** integrate to the true storage.
+
+Resolve it by inverting which quantity is primary. The depression's area–elevation
+curve `A(z)` is a genuinely 2-D measurement and comes from the DEM; the link widths
+are then whatever reproduces it. For a depression spanning links *l* with nodes *i*:
+
+> **Σ B(x_i, z) · Δx_i  =  A(z)   at every z**
+
+`B` on a depression link is therefore an **effective** width, not a measurable
+perpendicular one. Volume is then exact by construction and independent of how bent
+the axis is:
+
+> V(z) = ∫ Σ B Δx dz' = ∫ A(z') dz' = the true depression volume.
+
+This costs nothing in the solver, which already reads `B` per node and whose
+`storage_volume` is documented as *"per unit valley length"* (`valley.py:151`), so
+the `B · Δx` product is the quantity it already forms.
+
+What the along-axis *distribution* of `A(z)` controls is only **where inside the
+depression** material accumulates – the delta-progradation question – not **how
+much** the depression holds. That is the right place for a modelling choice to
+live, and it is FluvTree's, not the producer's.
+
+**Anchoring the axis.** The producer does not have to invent it: `dephier` already
+emits `pit_cell` (the deepest point) and `out_cell` (the sill). A depression link
+runs from where the network enters the depression, through `pit_cell`, to
+`out_cell`.
+
+### 1.2 Making the geometry updatable without a callback
+
+The structure must support geometry that changes as the landscape evolves. Four
+cases, and three of them stay inside FluvTree:
+
+1. **Sediment fills a basin.** The floor rises; `A(z)` is the original curve with
+   its lower part truncated. Raising the datum is internal.
+2. **A sill erodes.** `out_elev` drops, truncating the top of the usable curve.
+   Internal.
+3. **Two depressions merge.** The combined curve is the *meta*-depression's `A(z)`
+   – already a node in the hierarchy. **This is free if and only if the producer
+   ships hypsometry for meta-depressions, not just leaves.** See §2.5.
+4. **A new depression forms** where the network was a river. Internal *provided*
+   the initial delivery carried `(z, B)` levels over a generous elevation range
+   (§1). Ponding is then just integrating a curve that is already there.
+
+The limit, stated honestly: if the planform changes enough that the **axis itself
+is wrong** – a lake growing laterally into a sub-basin the graph does not
+represent – no amount of stored `B(z)` recovers it, and the producer must be re-run.
+That is a real boundary of the one-shot-file design, not something to paper over.
+
 ## 2. Required deliverables
 
 Constraints below marked *(verified)* are read off the current code, with the line
@@ -105,6 +159,9 @@ Per depression, including ones that are dry today:
 15. `out_seg`, `out_node` – *where on the segment graph the sill sits*
 16. `dep_vol` – capacity to the sill
 17. endorheic / ocean-linked flag
+18. `A(z)` – the area–elevation curve, **for meta-depressions as well as leaves**.
+    Per §1.2 case 3, shipping the meta curves is what makes a lake merge a lookup
+    rather than a recomputation.
 
 Item 15 is the one that does not exist in any current output and is the crux of
 the join (§5): the hierarchy knows the sill as a raster cell; FluvTree needs it as
@@ -112,14 +169,14 @@ a position on a reach.
 
 ### 2.6 Boundaries
 
-18. outlet segment and node, `x_bl`, `z_bl`.
-19. per-head `S0` or a network-level `Q_s_0` (the existing
+19. outlet segment and node, `x_bl`, `z_bl`.
+20. per-head `S0` or a network-level `Q_s_0` (the existing
     `RiverNetwork.from_arrays` boundary set).
 
 ### 2.7 Georeferencing and provenance
 
-20. `x`, `y` per node, and the CRS.
-21. **Provenance block**: DEM source and resolution, computational region,
+21. `x`, `y` per node, and the CRS.
+22. **Provenance block**: DEM source and resolution, computational region,
     RichDEM / `r.richdem` versions, and **every threshold applied, with the count
     of features it kept and dropped**.
 
