@@ -225,11 +225,43 @@ This is a refinement of §1.2, not a reversal of it: leaf granularity and
 "meta-depressions are groupings, not links" are unchanged. Only the carrier of the
 label moves, from link to node.
 
-It is also *more* correct independently of stubs. **A shoreline is not a link
-boundary.** It moves continuously with water level, so quantising depression
-membership to link boundaries misplaces it by up to a link length. Per node, it is
-quantised to node spacing – the model's own resolution – and refining it is the
-same knob as refining anything else.
+**Assign by cell overlap, not by point-in-polygon.** A link overlies a depression
+over a measurable *length*, which makes link-to-depression a principled
+extent-against-extent comparison. A bare point has no such measure, so labelling
+"is this node inside the polygon?" would be a knife-edge and would be a genuine
+step down from link assignment.
+
+The node is not a bare point here. It owns an explicit control volume: half the
+upstream spacing plus half the downstream spacing, which the solver computes
+outright – `land = B[1] * 0.5 * ((x[1] - x[0]) + (x[2] - x[1]))`
+(`diffusion.py:284`, and the same form at `188-197`). So the assignment rule is
+
+> intersect each node's **cell** with the depression own-regions, exactly as one
+> would intersect a link, and assign the cell by its overlap.
+
+That restores the extent-against-extent comparison, and at **finer** resolution
+than links: a link is a union of cells, so link-level assignment is precisely the
+*coarsening* of cell-level assignment. Cell-level therefore dominates link-level
+rather than trading against it.
+
+The stronger reason to prefer it: the partition should be over **the same control
+volumes the solver conserves over**. Then `Σ B(x_i, z) · Δx_i = A(z)` is a
+statement about the very volumes that appear in the mass balance, not about a
+different tiling that happens to cover the same ground.
+
+**The one remaining choice**, and it is a choice: what to do with a cell that
+straddles a margin. Winner-take-all by majority overlap is the natural rule and
+keeps one label per node. A *fractional* membership is representable but buys
+little – because `B` is derived from `A` (§1.1), the producer absorbs any
+quantisation into the widths and **volume stays exact regardless**; a fraction
+would only refine sub-cell basin membership. I would take majority overlap, but
+the call is Andy's.
+
+**A correction to an earlier draft of this section.** It argued that per-link
+labelling "misplaces the shoreline by up to a link length". That was wrong. The
+shoreline is set by the `z_bed < z_w` test in §1.5, evaluated per node, and is
+resolved at node spacing whatever carries the label. Label granularity governs
+the *storage partition* and *basin membership near margins* – not the shoreline.
 
 What this does **not** fix: two tributary junctions falling close together. That is
 a property of the drainage network itself, present with or without depressions, and
