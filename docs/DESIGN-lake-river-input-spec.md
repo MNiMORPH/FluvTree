@@ -140,37 +140,38 @@ The solver already permits the run-time result: confluence assembly sums over
 `for j in up_ids` with no cap (`diffusion.py:254`), so an *n*-way shared surface
 costs nothing.
 
-### 1.5 What each link carries, and what FluvTree writes
+### 1.5 What each node carries, and what FluvTree writes
 
 Junction degree being state needs one stored field, not a list.
 
-**One label per link: the smallest hierarchy node whose OWN region contains it.**
+**One label per NODE: the smallest hierarchy node whose OWN region contains it.**
+(Per node, not per link – see §1.6.)
 A node's own region is its extent minus its children's – so a leaf's own region is
 the basin itself, and a meta-depression's own region is just the saddle ground
 between its two children. Those own-regions tile the landscape exactly (this *is*
-the §1.2 partition), so every link falls in exactly one:
+the §1.2 partition), so every node falls in exactly one:
 
-| link | `dep_label` |
+| node | `dep_label` |
 |---|---|
-| a leaf-depression link | that leaf |
-| a connecting reach over a pour point | the **meta**-depression that drowns it |
-| a river outside every depression | null / ocean-linked |
+| inside a leaf depression | that leaf |
+| on a connecting reach over a pour point | the **meta**-depression that drowns it |
+| outside every depression | null / ocean-linked |
 
-So tributary links do **not** carry duplicate labels of the same depression. They
-carry *different* labels, and what they share at high water is a **common ancestor
-in the tree**. "Which links are in meta-depression *M*?" is then a subtree query,
-and membership is derived, never stored twice.
+So tributary links do **not** carry duplicate labels of the same depression. Their
+nodes carry *different* labels, and what they share at high water is a **common
+ancestor in the tree**. "Which nodes are in meta-depression *M*?" is then a subtree
+query, and membership is derived, never stored twice.
 
 **The run-time state.** The filled bodies at any instant are an **antichain** of
 the tree – a set of nodes, none an ancestor of another. Each step:
 
 1. take the active antichain and each active node's water level (FSM's output);
-2. for each active node *D* at level `z_D`: every link whose label lies in *D*'s
-   subtree, and whose bed is below `z_D`, joins one body with surface `z_D`;
-3. everything else is a river link.
+2. for each active node *D* at level `z_D`: every **node** whose label lies in
+   *D*'s subtree, and whose bed is below `z_D`, joins one body with surface `z_D`;
+3. everything else is river.
 
-A graph junction whose entering *and* leaving links are all in the same body is not
-a hydraulic confluence at all – it is an interior point of a flat water surface.
+A graph junction whose adjacent nodes are all in the same body is not a hydraulic
+confluence at all – it is an interior point of a flat water surface.
 That is where the *n*-way behaviour comes from: the body groups the links, and the
 graph never changes.
 
@@ -188,9 +189,53 @@ tributaries `L1, L2 → A` and `L3 → B`.
 unchanged: the producer ships what *can* happen – the hierarchy is every possible
 lake configuration – and FluvTree writes what *is* happening. Stored and immutable:
 `dep_label`, the tree, merge elevations, `A(z)` / `B(x, z)`. Written each step by
-FluvTree: `seg_type`, `z_w`, and the body each link currently belongs to.
+FluvTree: `seg_type`, `z_w`, and the body each node currently belongs to.
 
-### 1.6 Making the geometry updatable without a callback
+### 1.6 Short segments: put the label on nodes so the cut becomes optional
+
+Depression margins and tributary junctions are both fixed by terrain. When they
+land close together, cutting the graph at the margin leaves a stub segment.
+
+**Measured behaviour first** (steady state, gravel closure, uniform `Q`, analytic
+fixed point `S → S0`; scripts in the session scratchpad):
+
+| squeezed feature | length | `max|S-S0|/S0` | `cond(LHS)` |
+|---|---|---|---|
+| 1:1 segment in series | 2000 m | 3.7e-15 | 3.2e+01 |
+| | 20 m | 9.1e-13 | 2.9e+05 |
+| | 0.2 m | 4.0e-11 | 2.9e+09 |
+| 2:1 tributary-to-confluence face | 500 m | 1.1e-14 | 2.9e+01 |
+| | 1 m | 6.3e-12 | 1.5e+04 |
+| | 0.01 m | 1.0e-10 | 1.5e+06 |
+
+Two things follow. **(1)** There is no silent-wrong-answer regime here: the steady
+state stays correct to ~1e-10 across five orders of magnitude of shortening, and
+the confluence land area tends to a finite limit rather than vanishing.
+**(2)** Conditioning degrades as `1/L` and nothing else does, leaving large headroom
+in double precision. Node-count violations remain a clean failure
+(`ValueError: confluence segment 2 needs >= 3 nodes (has 2)`, verified).
+
+So the hazard is real but mild, and does not justify inventing a minimum-length
+threshold. **The structural fix is better: label nodes rather than links, which
+makes cutting the graph at a depression margin optional.** The producer then cuts
+where it is convenient and declines where it would leave a stub, and the graph
+retains only its 2:1 tributary breaks – the ordinary drainage network.
+
+This is a refinement of §1.2, not a reversal of it: leaf granularity and
+"meta-depressions are groupings, not links" are unchanged. Only the carrier of the
+label moves, from link to node.
+
+It is also *more* correct independently of stubs. **A shoreline is not a link
+boundary.** It moves continuously with water level, so quantising depression
+membership to link boundaries misplaces it by up to a link length. Per node, it is
+quantised to node spacing – the model's own resolution – and refining it is the
+same knob as refining anything else.
+
+What this does **not** fix: two tributary junctions falling close together. That is
+a property of the drainage network itself, present with or without depressions, and
+is left open.
+
+### 1.7 Making the geometry updatable without a callback
 
 The structure must support geometry that changes as the landscape evolves. Four
 cases, and three of them stay inside FluvTree:
@@ -228,8 +273,8 @@ that enforces them.
 4. **One outlet.** *(verified: `network.py:111`, `diffusion.py:122`,
    `advection.py:34,45` all take `mouth_segments()[0]`.)* Multiple outlets are not
    supported today; see §7.
-5. `dep_label` – the hierarchy node whose **own region** contains this link, per
-   §1.5; null for a link outside every depression. This is the immutable field the
+5. `dep_label` – **per node**, the hierarchy node whose **own region** contains
+   it, per §1.5; null outside every depression. This is the immutable field the
    producer ships. `seg_type` (`"river"` / `"lake"`) is **not** shipped as
    structure – FluvTree derives it each step from the active antichain – though an
    initial classification is useful as a t=0 state and as a check on the producer.
