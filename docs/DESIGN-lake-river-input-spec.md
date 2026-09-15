@@ -140,7 +140,57 @@ The solver already permits the run-time result: confluence assembly sums over
 `for j in up_ids` with no cap (`diffusion.py:254`), so an *n*-way shared surface
 costs nothing.
 
-### 1.5 Making the geometry updatable without a callback
+### 1.5 What each link carries, and what FluvTree writes
+
+Junction degree being state needs one stored field, not a list.
+
+**One label per link: the smallest hierarchy node whose OWN region contains it.**
+A node's own region is its extent minus its children's – so a leaf's own region is
+the basin itself, and a meta-depression's own region is just the saddle ground
+between its two children. Those own-regions tile the landscape exactly (this *is*
+the §1.2 partition), so every link falls in exactly one:
+
+| link | `dep_label` |
+|---|---|
+| a leaf-depression link | that leaf |
+| a connecting reach over a pour point | the **meta**-depression that drowns it |
+| a river outside every depression | null / ocean-linked |
+
+So tributary links do **not** carry duplicate labels of the same depression. They
+carry *different* labels, and what they share at high water is a **common ancestor
+in the tree**. "Which links are in meta-depression *M*?" is then a subtree query,
+and membership is derived, never stored twice.
+
+**The run-time state.** The filled bodies at any instant are an **antichain** of
+the tree – a set of nodes, none an ancestor of another. Each step:
+
+1. take the active antichain and each active node's water level (FSM's output);
+2. for each active node *D* at level `z_D`: every link whose label lies in *D*'s
+   subtree, and whose bed is below `z_D`, joins one body with surface `z_D`;
+3. everything else is a river link.
+
+A graph junction whose entering *and* leaving links are all in the same body is not
+a hydraulic confluence at all – it is an interior point of a flat water surface.
+That is where the *n*-way behaviour comes from: the body groups the links, and the
+graph never changes.
+
+**Worked case.** Leaves *A*, *B*; parent *M*; saddle reach `L_S` between them;
+tributaries `L1, L2 → A` and `L3 → B`.
+
+- *Low water*, antichain `{A, B}`: body *A* = `{L_A}`. `L1` and `L2` meet it as two
+  ordinary binary confluences. `L_S` is a river.
+- *High water*, `A` spills over its `geolink` into `B` and they merge; antichain
+  `{M}`: body *M* = subtree(*M*) = `{L_A, L_S, L_B}`. Now `L1, L2, L3` all end on
+  one surface – three tributaries, one water body – while the stored graph is still
+  the same binary graph, and the junctions inside the lake are interior points.
+
+**The division of labour this implies**, and it is the guiding principle applied
+unchanged: the producer ships what *can* happen – the hierarchy is every possible
+lake configuration – and FluvTree writes what *is* happening. Stored and immutable:
+`dep_label`, the tree, merge elevations, `A(z)` / `B(x, z)`. Written each step by
+FluvTree: `seg_type`, `z_w`, and the body each link currently belongs to.
+
+### 1.6 Making the geometry updatable without a callback
 
 The structure must support geometry that changes as the landscape evolves. Four
 cases, and three of them stay inside FluvTree:
@@ -178,7 +228,11 @@ that enforces them.
 4. **One outlet.** *(verified: `network.py:111`, `diffusion.py:122`,
    `advection.py:34,45` all take `mouth_segments()[0]`.)* Multiple outlets are not
    supported today; see §7.
-5. `seg_type` – `"river"` or `"lake"`, the initial classification.
+5. `dep_label` – the hierarchy node whose **own region** contains this link, per
+   §1.5; null for a link outside every depression. This is the immutable field the
+   producer ships. `seg_type` (`"river"` / `"lake"`) is **not** shipped as
+   structure – FluvTree derives it each step from the active antichain – though an
+   initial classification is useful as a t=0 state and as a check on the producer.
 
 ### 2.2 Along-flow geometry, per segment, per node
 
