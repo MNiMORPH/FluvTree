@@ -94,13 +94,14 @@ on the other side of the pour point"* and `odep` *"the depression this one
 overflows into"*. So a meta-depression's links form a **connected subgraph**, not
 disconnected pieces.
 
-**This requires a conditioning decision, and it is load-bearing.** The drainage
-network must be extracted from a **depression-filled or breached** DEM, while the
-depression hierarchy is computed on the **original** DEM. Only then does the
-network run continuously through each basin and out over its sill, so the
-connecting reaches exist as links to be grouped. Extract the network on the raw DEM
-and flow terminates at every pit, leaving the depression links genuinely
-disconnected and this whole construction unavailable.
+**This requires one property of the network, and it is load-bearing: the network
+must be COMPLETE.** Continuous from every channel head, through every depression,
+out over its sill, to the outlet – no interior termini. Filling, breaching, and
+least-cost-path routing all deliver that; **the spec requires the property, not the
+method**. The depression hierarchy is computed on the *original* DEM either way.
+Without completeness, flow terminates at every pit, the connecting reaches do not
+exist as links, and the depression links really are disconnected – this whole
+construction is then unavailable.
 
 **The storage constraint becomes hierarchical, and is free.** With §1.1 applied per
 link, for any node *D* of the tree:
