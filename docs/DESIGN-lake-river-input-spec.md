@@ -302,6 +302,15 @@ What this does **not** fix: two tributary junctions falling close together. That
 a property of the drainage network itself, present with or without depressions, and
 is left open.
 
+**What the measurements do not cover, stated so it is not mistaken for settled.**
+They are **steady-state only**, on a gravel closure with uniform `Q` and a
+rectangular valley. Untested: the transient approach (a tiny cell has a short
+response time, and the Picard iteration under a dynamic source may behave
+differently); a *lake* link, whose `B` is orders of magnitude larger than its
+neighbours' and which was never in the test network at all; and the advection
+solver. The conclusion "short segments degrade conditioning but not accuracy" is
+therefore warranted for the case measured and is a hypothesis elsewhere.
+
 ### 1.7 Making the geometry updatable without a callback
 
 The structure must support geometry that changes as the landscape evolves. Four
@@ -758,7 +767,7 @@ These are decisions, not defaults. None should be picked silently.
 
 **One self-describing NetCDF file.** The ragged cross-sections are the awkward
 part, and NetCDF carries them cleanly as flat value arrays plus an `offsets`
-index – mirroring `ValleyGeometry`'s layout exactly. The provenance block of §2.7
+index – mirroring `ValleyGeometry`'s layout exactly. The provenance block of §2.8
 becomes file attributes.
 
 Alternative: a directory of Parquet + a JSON manifest. Not recommended: any
