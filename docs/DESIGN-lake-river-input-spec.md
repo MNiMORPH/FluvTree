@@ -446,16 +446,32 @@ Item 15 is the one that does not exist in any current output and is the crux of
 the join (§5): the hierarchy knows the sill as a raster cell; FluvTree needs it as
 a position on a reach.
 
-### 2.6 Boundaries
+### 2.6 Boundaries – deliberately empty
 
-20. outlet segment and node, `x_bl`, `z_bl`.
-21. per-head `S0` or a network-level `Q_s_0` (the existing
-    `RiverNetwork.from_arrays` boundary set).
+**No boundary condition is the producer's.** They sit on the topology; they are not
+part of it, and none of them is a terrain product:
+
+- `S0` / `Q_s_0` – upstream sediment supply has no terrain basis whatever. A DEM
+  cannot tell you what it is.
+- `z_bl` – whether base level is held, dropped or cycled is a modelling choice. The
+  producer could offer the outlet's terrain elevation as a starting value, but that
+  is a convenience, not a deliverable.
+- `x_bl` – where the outlet ghost node sits. This looks geometric, but it is part of
+  *how base level is imposed*, not of the terrain: it says where the condition is
+  applied. The solver already defaults it by linear extrapolation
+  (`diffusion.py`: `2 * x[-1] - x[-2]` when absent).
+- **Initial water state** – how much water each depression holds at `t = 0`. It is
+  "what *is* happening", which §1.5 assigns to FluvTree, and deriving it needs a
+  water input that is itself a modelling choice. Recorded in §7.
+
+The producer's whole obligation here is to make the boundaries **addressable**: say
+which node is the outlet and which are channel heads. Both are topology, and both
+are already covered by §2.1.
 
 ### 2.7 Georeferencing and provenance
 
-22. `x`, `y` per node, and the CRS.
-23. **The provenance block** – specified in full in §2.8.
+20. `x`, `y` per node, and the CRS.
+21. **The provenance block** – specified in full in §2.8.
 
 ### 2.8 The provenance block
 
@@ -786,6 +802,13 @@ Out of scope for this spec, recorded so they are not lost:
 4. Multi-outlet support (§2.1 item 4).
 5. The lake sediment budget – trapping efficiency, and uniform infill versus delta
    progradation. A modelling choice, not a numerical one.
+6. **Every boundary condition** (§2.6), including the ones currently read off
+   `RiverNetwork.from_arrays`: `S0` / `Q_s_0`, `z_bl`, `x_bl`.
+7. **Initial water state**, and the ongoing water input. FSM needs to be told how
+   much water is in the system – `r.richdem.fsm` takes a `water_depth` – and
+   nothing currently supplies it: `z_w` appears in this spec only as a field
+   FluvTree *writes*. Both the `t = 0` volume per depression and the per-step
+   runoff forcing are modelling inputs.
 
 ## 8. Naming
 
