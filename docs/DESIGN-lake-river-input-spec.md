@@ -356,6 +356,33 @@ that enforces them.
    needs ≥ 2. The producer must honour this when it chooses breakpoints, or
    FluvTree raises at solver construction.
 
+**Which nodes go in the segment array – an unresolved inconsistency in FluvTree
+itself, which the producer must not guess at.** Two conventions are documented in
+the codebase and they disagree:
+
+- `network.py` says edges hold the reach's ***interior*** arrays and that a reach's
+  two endpoints "live on the graph nodes it connects, held once and shared", with
+  `reach_profile` assembling `hstack(upstream node, edge interior, downstream
+  node)`.
+- `diffusion.py:18-22` says the opposite – per-segment arrays "carry **all** their
+  own nodes", the junction value is duplicated across both sides of a finite face,
+  and graph junction nodes are "topological markers holding boundary scalars, not
+  shared `z` degrees of freedom".
+
+**The solver convention is the one actually exercised.** In `src/`, `set_node_field`
+is only ever called for boundary scalars – `S0`, `x_bl`, `z_bl` (`network.py:110-113`)
+– never for `z`; and `reach_profile` has no caller outside its own unit test
+(`test_network_substrate.py:79`).
+
+This is a live hazard for this spec, not a stylistic wrinkle. A producer that
+followed `network.py`'s docstring would emit **interior-only** arrays and place the
+endpoint `z` on the junction nodes. The solver would read the short arrays, never
+look at the node values, and solve a subtly different problem – **no error, no
+warning, a wrong profile**. So: **emit full per-segment arrays including both
+endpoints**, matching the tests. Resolving which convention FluvTree keeps is a
+FluvTree decision, not a producer one, and it should be settled before the reader
+is written.
+
 ### 2.3 Cross-section geometry, per node, ragged
 
 9. `z_levels`, `B_levels` – ascending `z`, paired widths. **≥ 2 levels per node**
@@ -626,9 +653,14 @@ These are decisions, not defaults. None should be picked silently.
    the separation – tributaries end at 8000 while the confluence segment starts at
    10000, a full spacing apart.
 
-   The same reading error produces it at a sill or a depression margin, which is
-   what §1.6's "bracket the margin, never land on it" already says. The rule is
-   general: **every junction, sill and margin is a face, not a node.**
+   **To be clear about what is topology and what is discretisation:** a confluence
+   *is* a node of the graph, and so are a sill and a depression margin – the
+   producer emits all three as nodes, and `from_segment_lists` creates `('jcn', s)`
+   for every one. What is *not* a node is the solver's **sample point**: the two
+   segments meeting at that graph node each carry their own terminal sample, and it
+   is those two samples that must not share an `x`. The graph node sits between
+   them. §1.6's "bracket the margin" is a statement about sample placement around a
+   node, not a denial that the node exists.
 
    A second, duller mechanism: sampling node positions from vector-line vertices
    without de-duplicating repeated ones. The prototype does something adjacent –
