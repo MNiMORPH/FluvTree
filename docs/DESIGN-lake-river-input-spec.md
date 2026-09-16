@@ -542,10 +542,37 @@ These are decisions, not defaults. None should be picked silently.
    (integer-metre lidar, low-relief glaciated terrain) produces many more of them
    than *"hopefully ... only rarely"* suggests.
 
-   **Not verified here: `r.watershed`.** GRASS is installed on this machine as a
-   binary only, with no C source, so its flat handling has not been checked. If the
-   producer routes with `r.watershed` rather than RichDEM, that check is
-   outstanding.
+   **`r.watershed` is also deterministic** (checked against OSGeo/grass `main`).
+   Its A\* heap breaks equal-elevation ties on insertion order, in both
+   implementations:
+
+   ```c
+   /* raster/r.watershed/ram/do_astar.c */
+   static int cmp_pnt(CELL elea, CELL eleb, size_t addeda, size_t addedb)
+   {
+       if (elea == eleb) { return (addeda < addedb); }
+       return (elea < eleb);
+   }
+   ```
+
+   The `seg/` variant carries the same rule, and neither uses OpenMP – the A\*
+   search is single-threaded.
+
+   **But note the conventions are opposite.** RichDEM returns the cell added
+   *last* among equal elevations; `r.watershed` returns the one added *first*. Both
+   are deterministic; they are not the *same* determinism, so the two will resolve
+   a given flat differently. Networks intended for comparison must be produced by
+   one routing engine throughout – not one here and one there.
+
+   **Two `r.watershed` flags are load-bearing:**
+
+   - **`-s` is required.** The manual is explicit – *"SFD (D8) flow (default is
+     MFD)"* – so the **default is multiple-flow-direction** and would break the
+     convergence requirement above. (`scripts/drainageNetworkGRASS.py:41` already
+     passes `flags='s'`, so the prototype is correct on this point.)
+   - **`-b` must not be used.** *"Beautify flat areas: Flow direction in flat areas
+     is modified to look prettier"* – a cosmetic alteration of exactly the flow
+     directions this section depends on.
 
    One residual, and it is not the hierarchy's: the **stream network** is extracted
    separately, and `r.richdem.flowaccumulation` offers MFD algorithms (D-infinity,
