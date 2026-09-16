@@ -356,32 +356,36 @@ that enforces them.
    needs ≥ 2. The producer must honour this when it chooses breakpoints, or
    FluvTree raises at solver construction.
 
-**Which nodes go in the segment array – an unresolved inconsistency in FluvTree
-itself, which the producer must not guess at.** Two conventions are documented in
-the codebase and they disagree:
+**Which nodes go in the segment array is per-process, and the producer must
+declare which convention it emits.** This is settled FluvTree design, not an open
+question – `c697e468`, "Correct reach-assembly convention: GRLP has no shared
+junction dof":
 
-- `network.py` says edges hold the reach's ***interior*** arrays and that a reach's
-  two endpoints "live on the graph nodes it connects, held once and shared", with
-  `reach_profile` assembling `hstack(upstream node, edge interior, downstream
-  node)`.
-- `diffusion.py:18-22` says the opposite – per-segment arrays "carry **all** their
-  own nodes", the junction value is duplicated across both sides of a finite face,
-  and graph junction nodes are "topological markers holding boundary scalars, not
-  shared `z` degrees of freedom".
+> The shared-junction-node interpretation is **per-process** (natural for
+> one-dof-per-node processes like TerraPIN), **not universal**. Verified against
+> `grlp@366fb3e` that GRLP owns all nodes per segment and couples confluences via a
+> matrix row, not a shared `z`. **The substrate stays agnostic and stores whatever
+> fields each process needs.**
 
-**The solver convention is the one actually exercised.** In `src/`, `set_node_field`
-is only ever called for boundary scalars – `S0`, `x_bl`, `z_bl` (`network.py:110-113`)
-– never for `z`; and `reach_profile` has no caller outside its own unit test
-(`test_network_substrate.py:79`).
+So the two readings are both legitimate and neither is *the* canonical shape:
 
-This is a live hazard for this spec, not a stylistic wrinkle. A producer that
-followed `network.py`'s docstring would emit **interior-only** arrays and place the
-endpoint `z` on the junction nodes. The solver would read the short arrays, never
-look at the node values, and solve a subtly different problem – **no error, no
-warning, a wrong profile**. So: **emit full per-segment arrays including both
-endpoints**, matching the tests. Resolving which convention FluvTree keeps is a
-FluvTree decision, not a producer one, and it should be settled before the reader
-is written.
+- **all-nodes-per-segment** – what the alluvial diffusion solver consumes, where
+  the junction is coupled by a matrix row across a finite face and there is no
+  shared junction `z`;
+- **interior-plus-shared-endpoints** – natural for a one-DOF-per-node process,
+  which is what `reach_profile` serves.
+
+`RiverNetwork` defines the topology and holds whatever fields a process needs; a
+solver *consumes* that and builds its own state layout. Neither solver's internal
+arrangement defines the interchange.
+
+**The consequence for this file is a mandatory declaration, not a fixed shape.**
+Emitting one convention while the consuming process expects the other is a silent
+failure – short arrays read as complete, a subtly wrong profile, no error and no
+warning. So the file carries `node_convention` (§2.8) and the reader **validates it
+against the process being run** rather than assuming. Which convention a given
+producer run should emit follows from the process it is feeding, and is therefore a
+modelling choice, not a property of the terrain.
 
 ### 2.3 Cross-section geometry, per node, ragged
 
@@ -488,6 +492,8 @@ two networks are comparable at all.
 
 **(d) Every choice that can change the graph**
 
+    node_convention          # "all_nodes_per_segment" | "interior_plus_endpoints"
+                             #   — §2.2; validated against the consuming process
     conditioning_method      # fill | breach | least_cost  (§1.2 completeness)
     flow_direction           # must be SFD/D8
     beautify_flats           # must be false  (r.watershed -b)
