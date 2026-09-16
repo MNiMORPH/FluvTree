@@ -249,13 +249,38 @@ volumes the solver conserves over**. Then `Σ B(x_i, z) · Δx_i = A(z)` is a
 statement about the very volumes that appear in the mass balance, not about a
 different tiling that happens to cover the same ground.
 
-**The one remaining choice**, and it is a choice: what to do with a cell that
-straddles a margin. Winner-take-all by majority overlap is the natural rule and
-keeps one label per node. A *fractional* membership is representable but buys
-little – because `B` is derived from `A` (§1.1), the producer absorbs any
-quantisation into the widths and **volume stays exact regardless**; a fraction
-would only refine sub-cell basin membership. I would take majority overlap, but
-the call is Andy's.
+**Cutting at the margin makes the partition exact – bracket the margin, never land
+on it.** Cutting is topologically cleaner, and it does more than that: it removes
+the straddling cell entirely, because the two segments' adjacent nodes are
+separated by a **face**, and a face is exactly where control volumes meet. The
+solver duplicates the junction value rather than sharing it – *"the confluence
+value is duplicated across the mainstem's first node and each tributary's last
+node, separated by a finite face; junction nodes on the graph are topological
+markers ... not shared `z` degrees of freedom"* (`diffusion.py:18-22`) – and the
+face sits at the midpoint of the gap (`land = B[-1] * 0.5 * ((x[-1] - x[-2]) +
+(x[dj][0] - x[-1]))`, `diffusion.py:269`).
+
+So a margin at `x_m` is represented by **two nodes bracketing it**, at
+`x_m - δ/2` and `x_m + δ/2`: the upstream cell is then wholly outside the
+depression and the downstream cell wholly inside. No majority rule, no fraction,
+no quantisation.
+
+**The trap.** Placing a *single* node at `x_m` – the natural reading of "cut here"
+– gives the two duplicated DOFs the same coordinate, hence zero face length. That
+is a division by zero in `_face_conductance` and an exactly singular matrix, not a
+degraded answer. It is easy to do by accident; it arose twice while building the
+§1.6 experiments. **The producer must guarantee strictly increasing `x` across
+every cut.**
+
+**Where a fraction is still needed.** Only where the producer *declines* to cut –
+near a junction, to avoid a stub. There the margin falls mid-cell and the cell is
+split between two labels, 50/50 in the symmetric case. That is straightforward to
+carry as a `(label, fraction)` pair per side, and it is the right thing to do
+there. Note it is never *required* for volume: because `B` is derived from `A`
+(§1.1), the producer absorbs any quantisation into the widths and volume stays
+exact either way. The fraction buys sub-cell basin membership, which matters at
+the outer boundary of the top-level meta-depression, where "inside vs draining to
+the outlet" is the distinction being resolved.
 
 **A correction to an earlier draft of this section.** It argued that per-link
 labelling "misplaces the shoreline by up to a link length". That was wrong. The
