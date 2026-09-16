@@ -415,11 +415,88 @@ a position on a reach.
 ### 2.7 Georeferencing and provenance
 
 22. `x`, `y` per node, and the CRS.
-23. **Provenance block**: DEM source and resolution, computational region,
-    RichDEM / `r.richdem` versions, and **every threshold applied, with the count
-    of features it kept and dropped**. Include the **arbitrary-tie-break counts**
-    per §5.6 – outlets, pit cells, and flat directions resolved by an arbitrary
-    pick – and the flow-routing algorithm used, which must be single-direction.
+23. **The provenance block** – specified in full in §2.8.
+
+### 2.8 The provenance block
+
+Both routing engines are deterministic (§5.6), so the network is **reproducible**:
+the same DEM through the same engine with the same settings yields the same graph.
+That makes a real reproducibility contract possible rather than aspirational – but
+only if the file carries everything that determines the answer. The organising
+rule, as elsewhere: **the file states what made it, and the producer refuses to
+write a file with any of it missing** – the same discipline as `trust/provenance.py`
+raising when a step is skipped.
+
+The test to apply to every candidate field: *could changing this change the graph?*
+If yes it is mandatory. Timestamps and hostnames fail that test and are recorded
+as context, never as identity.
+
+**(a) Identity of this file**
+
+    spec_version, created (ISO-8601 UTC), output_sha256
+
+`output_sha256` covers the data payload excluding this block, so a re-run can be
+proved identical rather than assumed so.
+
+**(b) The input grid** – this alone fixes the discretisation
+
+    dem_source, dem_sha256, dem_crs, dem_nodata
+    dem_type           # CELL / FCELL / DCELL
+    dem_units, dem_vertical_datum
+    region: n, s, e, w, nsres, ewres, rows, cols
+
+`dem_type` earns its place: **integer elevations produce vastly more equal-elevation
+ties** than float ones, so it predicts how much of the network rests on a tie rule
+rather than on terrain. A hash, not just a path – a filename is not an identity.
+
+**(c) What generated it**
+
+    producer_name, producer_version, producer_git_commit
+    routing_engine     # "richdem" | "r.watershed"
+    richdem_version, grass_version, r_richdem_version
+
+`routing_engine` is load-bearing, not bookkeeping: the two engines break ties in
+**opposite** directions (§5.6), so this field is what tells a later reader whether
+two networks are comparable at all.
+
+**(d) Every choice that can change the graph**
+
+    conditioning_method      # fill | breach | least_cost  (§1.2 completeness)
+    flow_direction           # must be SFD/D8
+    beautify_flats           # must be false  (r.watershed -b)
+    flat_resolution          # "richdem:Barnes2014" | "r.watershed:astar"
+    tie_break                # "LIFO" (richdem) | "FIFO" (r.watershed)
+    stream_threshold, accumulation_units
+    min_depression_criterion, min_depression_value    # §5.3 – still unset
+    snap_tolerance                                    # §5.5 – still unset
+    stub_policy, stub_threshold                       # §1.6
+    commands                 # the literal invocations, in order, verbatim
+
+`commands` is what turns the block from a description into a reproduction recipe.
+
+**(e) Counts – where the conventions actually bit**
+
+Parameters say what was *configured*; counts say what it *did*. Both are required.
+
+    n_links, n_nodes, n_heads, n_outlets
+    n_depressions_leaf, n_depressions_meta
+    n_depressions_dropped_by_filter
+    n_cells_in_flats
+    n_ties_outlet, n_ties_pit, n_ties_flat_direction
+    n_cuts_declined_stub, n_margins_fractional
+
+The three `n_ties_*` counts are the ones §5.6 exists for: they measure how much of
+the network rests on a tie-break convention instead of on the landscape. A run
+where they are large is not *wrong* – it is reproducible – but it is a run whose
+flat-country topology would change under the other engine, and the reader deserves
+to know that before comparing it with anything.
+
+`n_depressions_dropped_by_filter` follows the standing rule that a filter reports
+what it kept **and** what it removed.
+
+**Two fields have no value yet** – `min_depression_*` (§5.3) and `snap_tolerance`
+(§5.5). The schema slots exist; the numbers are Andy's to set, and the producer
+should refuse to run until they are given rather than fall back to a default.
 
 ## 3. What FluvTree must do with it
 
