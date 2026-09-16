@@ -590,12 +590,14 @@ These are decisions, not defaults. None should be picked silently.
    is strictly better than a preprocessor guess, and it removes the last invented
    threshold from the producer.
 
-   Two consequences to watch, neither fatal. **(1)** The tree gains a node per pit,
-   and `A(z)` ships per node, so a noisy lidar DEM produces a large hierarchy –
-   a data-volume and lookup cost, not a correctness one. **(2)** Noise pits sitting
-   in channels will label stream links as depressions at t=0; they self-clear on
-   the first fill. Both are visible through the §2.8 counts, which is why those
-   counts are mandatory.
+   **The producer's goal is exactness; pruning is a downstream optimisation.** Ship
+   the exact network the terrain implies, and prune later if computation demands
+   it – a prune applied then is a recorded, reversible choice made against a known
+   cost, whereas a filter applied here is an irreversible guess baked into the
+   data. The two consequences – a hierarchy node per pit (a data-volume and lookup
+   cost, not a correctness one) and noise pits briefly labelling channel links as
+   depressions at t=0 – are both visible through the §2.8 counts, which is part of
+   why those counts are mandatory.
 4. **Endorheic basins and the ocean.** How `ocean_parent` maps onto the outlet
    boundary, and what a basin that never spills means for downstream `Q`.
 5. ~~**Snapping tolerance.**~~ **Settled: none needed. Place the node at the
@@ -604,17 +606,41 @@ These are decisions, not defaults. None should be picked silently.
    degrades as `1/L` and nothing else does – so there is never a reason to snap a
    sill to a nearby breakpoint rather than put a node where the sill actually is.
 
-   **What remains is a degeneracy rule, not a tolerance.** The one hard failure the
-   same measurements found is two nodes at the *same* coordinate: zero face length,
-   a divide by zero in `_face_conductance`, an exactly singular matrix. So if a
-   sill coincides with an existing node, use that node – do not insert a second one
-   there. That is an exact-equality check, not a tuned threshold, and it is already
-   constraint 4 of the producer-side validator (§5.8).
+   **What remains is a degeneracy rule, not a tolerance** – and it is worth being
+   exact about how one would ever hit it, because it is not a freak case.
 
-   The distinction matters for realistic inputs: sills land on cell centres, so a
-   sill is either *exactly* an existing node or at least a fraction of a cell away,
-   where `cond ~ 1/L` is still far inside double precision. There is no intermediate
-   regime needing a tuned ε.
+   **The mechanism is mistaking a face for a node.** In the solver's layout a
+   confluence is *not* a node: it is the **face** between the tributary's last node
+   and the mainstem's first node. The natural GIS reading is the opposite – a
+   junction is a point on the map, so put a node there – and taking both sides to
+   that point makes the face length zero. Measured:
+
+   | mainstem's first node | result |
+   |---|---|
+   | at the confluence point (8000 m) | `Matrix is exactly singular`, **z all NaN** |
+   | one spacing downstream (10000 m) | finite, correct |
+
+   Note the failure mode: `evolve` **does not raise**. It warns and returns NaN. So
+   unlike the short-segment case of §1.6, this one *is* a silent-wrong-answer path,
+   and it is the reason the validator exists. The test suite's own convention keeps
+   the separation – tributaries end at 8000 while the confluence segment starts at
+   10000, a full spacing apart.
+
+   The same reading error produces it at a sill or a depression margin, which is
+   what §1.6's "bracket the margin, never land on it" already says. The rule is
+   general: **every junction, sill and margin is a face, not a node.**
+
+   A second, duller mechanism: sampling node positions from vector-line vertices
+   without de-duplicating repeated ones. The prototype does something adjacent –
+   `drainageNetworkGRASS.py` concatenates every vertex of every line into one flat
+   array and takes a cumulative distance *across* line boundaries, so its junction
+   spacings are not meaningful to begin with.
+
+   **What is explicitly fine: coincidence between siblings.** Two tributaries
+   entering one confluence may share identical `x`, and the tests do exactly that
+   (`[_D * np.arange(1, 5.0)] * 4`) – each tributary's face is to the mainstem, not
+   to the other tributary. So the constraint is not "all coordinates distinct"; it
+   is **strictly increasing across every face**.
 6. ~~**Convergence guarantee.**~~ **Settled: the Depression Hierarchy cannot
    produce a divergent depression.** `out_cell`, `out_elev`, `odep` and `parent`
    are each single-valued, `lchild`/`rchild` make it a binary tree, and `flowdirs`
