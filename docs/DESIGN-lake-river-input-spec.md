@@ -332,12 +332,27 @@ is wrong** – a lake growing laterally into a sub-basin the graph does not
 represent – no amount of stored `B(z)` recovers it, and the producer must be re-run.
 That is a real boundary of the one-shot-file design, not something to paper over.
 
-## 2. Required deliverables
+## 2. Deliverables
+
+**Two tiers, and the distinction is the organising one for this whole file.**
+
+- **Core – the topology.** What makes this a river-and-lake network and what nothing
+  else can supply: the graph, where its nodes sit, the depression hierarchy, and the
+  storage geometry that makes a depression fillable rather than merely labelled.
+  §2.1, §2.2, §2.3, §2.5.
+- **Convenience – whatever else is cheap to pull from the DEM.** Not part of the
+  network; attached because the producer is holding the raster anyway and the
+  alternative is recomputing it later from a DEM the modeller may no longer have.
+  §2.4.
+
+§2.6 is empty by the same test (boundary conditions are modelling choices), and
+§2.7–2.8 stand outside both tiers: provenance is not payload, it is what makes the
+payload trustworthy, and is required regardless of what else is present.
 
 Constraints below marked *(verified)* are read off the current code, with the line
 that enforces them.
 
-### 2.1 Topology, per segment
+### 2.1 Topology, per segment — *core*
 
 1. `seg_id` – integer, stable.
 2. `upstream_segment_IDs`, `downstream_segment_IDs` – the form
@@ -356,7 +371,7 @@ that enforces them.
    structure – FluvTree derives it each step from the active antichain – though an
    initial classification is useful as a t=0 state and as a check on the producer.
 
-### 2.2 Along-flow geometry, per segment, per node
+### 2.2 Along-flow geometry, per segment, per node — *core*
 
 6. `x` – along-flow distance [m], monotonic.
 7. `z_bed` – bed or basin-floor elevation [m].
@@ -396,7 +411,7 @@ against the process being run** rather than assuming. Which convention a given
 producer run should emit follows from the process it is feeding, and is therefore a
 modelling choice, not a property of the terrain.
 
-### 2.3 Cross-section geometry, per node, ragged
+### 2.3 Cross-section geometry, per node, ragged — *core*
 
 9. `z_levels`, `B_levels` – ascending `z`, paired widths. **≥ 2 levels per node**
    *(verified: `valley.py:51`.)*
@@ -414,7 +429,7 @@ water-storage query needs the `lambda_p = 0` path. The producer therefore ships
 not a property of the container, and must not be folded into the delivered
 widths.
 
-### 2.4 Hydrology, per node – optional
+### 2.4 Convenience attributes — *not core*
 
 11. `A` – contributing drainage area [m²]. **Optional, and recommended.**
 
@@ -440,7 +455,30 @@ lakes break that – an endorheic basin passes no water downstream until it spil
 Area is time-invariant and routing-independent; discharge is neither. Give the
 invariant quantity and let `Q` be derived as routing changes.
 
-### 2.5 The depression hierarchy
+**What else is cheap from the same rasters.** These are proposals, not decisions –
+each is nearly free given what the producer already computes, and each is dropped
+without argument if unwanted:
+
+12. **Sinuosity per link** – the planform length of the polyline over the
+    straight-line distance between its ends. `DiffusionSolver` already takes
+    `sinuosity` as a physics parameter and currently **defaults it to 1**
+    (`diffusion.py:78`), where it enters `C0` as `sinuosity**-p`. The producer holds
+    the actual polyline and can measure it. This is the strongest candidate: a real
+    parameter FluvTree is presently guessing.
+13. **Shreve / Strahler order per link** – pure topology, free once the graph exists,
+    and the vocabulary `fluvtree.generate` already uses.
+14. **Depression statistics** – `cell_count`, `total_elevation`. `dephier` emits them
+    alongside `dep_vol` (already core, §2.5 item 16) at no extra cost.
+15. **Local relief or hillslope gradient beside each link** – from
+    `r.richdem.terrainattribute`. Not needed by any current process; the cheapest
+    thing to have already measured if hillslope coupling ever lands.
+
+Deliberately **not** on this list: valley width `B(x, z)` for *river* links. It is
+core (§2.3), not convenience, and it is not cheap — it needs cross-sections cut
+perpendicular to the channel, or TerraPIN. That is Gap 4 (§4.2), and calling it
+convenient would hide the one piece of core geometry nothing currently produces.
+
+### 2.5 The depression hierarchy — *core*
 
 Per depression, including ones that are dry today:
 
