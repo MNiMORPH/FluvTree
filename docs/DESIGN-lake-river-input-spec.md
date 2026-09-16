@@ -658,6 +658,26 @@ These are decisions, not defaults. None should be picked silently.
    why those counts are mandatory.
 4. **Endorheic basins and the ocean.** How `ocean_parent` maps onto the outlet
    boundary, and what a basin that never spills means for downstream `Q`.
+
+   *Determined so far.* **Endorheic-ness is dynamics, not topology.** Because §1.2
+   requires a *complete* network, conditioning already supplies an outflow path over
+   every rim, so an endorheic basin is not a second terminus – it is simply a
+   depression whose level never reaches its sill, leaving its outflow link unused.
+   That falls out of FSM and needs nothing from the producer. The ocean maps onto
+   the single outlet, and `ocean_parent` / ocean-linkage already ship (§2.5 item 17).
+
+   *But a dry link is not representable.* Measured on a three-segment chain with the
+   middle segment's `Q` driven to zero:
+
+   | `Q` on the middle link | result |
+   |---|---|
+   | 10, 1e-3, 1e-9 | finite, correct |
+   | **0** | `Matrix is exactly singular`, **z all NaN**, warnings only |
+
+   The interior stencil divides by `Q[i]` (`dQ_2c / Q[i]`), so discharge must be
+   strictly positive. "Endorheic = set `Q = 0` downstream" is therefore not
+   available, and the choice between a positive floor and excluding inactive links
+   from the assembly is open – the latter is the same machinery as §7.2.
 5. ~~**Snapping tolerance.**~~ **Settled: none needed. Place the node at the
    sill.** The §1.6 measurements are what license this: a node may be inserted
    arbitrarily close to an existing one without corrupting the answer – conditioning
