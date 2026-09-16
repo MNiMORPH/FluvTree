@@ -140,34 +140,43 @@ The solver already permits the run-time result: confluence assembly sums over
 `for j in up_ids` with no cap (`diffusion.py:254`), so an *n*-way shared surface
 costs nothing.
 
-### 1.5 What each node carries, and what FluvTree writes
+### 1.5 What each link carries, and what FluvTree writes
 
 Junction degree being state needs one stored field, not a list.
 
-**One label per NODE: the smallest hierarchy node whose OWN region contains it.**
-(Per node, not per link – see §1.6.)
+**One label per LINK: the smallest hierarchy node whose OWN region contains it.**
+Every degree of freedom then inherits it unambiguously, because a graph node
+belongs to its **downstream** link – `('jcn', s)` is named for the segment *leaving*
+it (`network.py:from_segment_lists`; *"a confluence node is named by the single
+segment leaving it"*) – and in the solver's layout each segment carries all its own
+nodes. So no DOF is ever shared between two labels. See §1.6 for the one exception.
 A node's own region is its extent minus its children's – so a leaf's own region is
 the basin itself, and a meta-depression's own region is just the saddle ground
 between its two children. Those own-regions tile the landscape exactly (this *is*
-the §1.2 partition), so every node falls in exactly one:
+the §1.2 partition), so every link falls in exactly one:
 
-| node | `dep_label` |
+| link | `dep_label` |
 |---|---|
 | inside a leaf depression | that leaf |
-| on a connecting reach over a pour point | the **meta**-depression that drowns it |
+| a connecting reach over a pour point | the **meta**-depression that drowns it |
 | outside every depression | null / ocean-linked |
+
+Downstream ownership also gives the right answer at both ends of a depression with
+no special rule: at the **entry** margin the node's downstream link is the
+depression, so it joins the depression; at the **sill** its downstream link is the
+river, so it does not – which is correct, since nothing above `out_elev` is stored
+in that depression anyway.
 
 So tributary links do **not** carry duplicate labels of the same depression. Their
 nodes carry *different* labels, and what they share at high water is a **common
-ancestor in the tree**. "Which nodes are in meta-depression *M*?" is then a subtree
-query, and membership is derived, never stored twice.
+ancestor in the tree**. "Which links are in meta-depression *M*?" is then a subtree query, and membership is derived, never stored twice.
 
 **The run-time state.** The filled bodies at any instant are an **antichain** of
 the tree – a set of nodes, none an ancestor of another. Each step:
 
 1. take the active antichain and each active node's water level (FSM's output);
-2. for each active node *D* at level `z_D`: every **node** whose label lies in
-   *D*'s subtree, and whose bed is below `z_D`, joins one body with surface `z_D`;
+2. for each active node *D* at level `z_D`: every DOF whose (inherited) label lies
+   in *D*'s subtree, and whose bed is below `z_D`, joins one body with surface `z_D`;
 3. everything else is river.
 
 A graph junction whose adjacent nodes are all in the same body is not a hydraulic
@@ -216,14 +225,10 @@ in double precision. Node-count violations remain a clean failure
 (`ValueError: confluence segment 2 needs >= 3 nodes (has 2)`, verified).
 
 So the hazard is real but mild, and does not justify inventing a minimum-length
-threshold. **The structural fix is better: label nodes rather than links, which
-makes cutting the graph at a depression margin optional.** The producer then cuts
-where it is convenient and declines where it would leave a stub, and the graph
-retains only its 2:1 tributary breaks – the ordinary drainage network.
-
-This is a refinement of §1.2, not a reversal of it: leaf granularity and
-"meta-depressions are groupings, not links" are unchanged. Only the carrier of the
-label moves, from link to node.
+threshold. **Cut at margins by default and keep the label on links**; where a cut
+would leave a stub next to a junction, decline it and carry a per-node label array
+on the one segment that spans the margin. The network holds arbitrary per-segment
+arrays, so the fallback costs nothing structurally.
 
 **Assign by cell overlap, not by point-in-polygon.** A link overlies a depression
 over a measurable *length*, which makes link-to-depression a principled
@@ -330,8 +335,9 @@ that enforces them.
 4. **One outlet.** *(verified: `network.py:111`, `diffusion.py:122`,
    `advection.py:34,45` all take `mouth_segments()[0]`.)* Multiple outlets are not
    supported today; see §7.
-5. `dep_label` – **per node**, the hierarchy node whose **own region** contains
-   it, per §1.5; null outside every depression. This is the immutable field the
+5. `dep_label` – **per link**, the hierarchy node whose **own region** contains it,
+   per §1.5; null outside every depression. Per node only on an uncut margin
+   (§1.6), which the network holds as an ordinary per-segment array. This is the immutable field the
    producer ships. `seg_type` (`"river"` / `"lake"`) is **not** shipped as
    structure – FluvTree derives it each step from the active antichain – though an
    initial classification is useful as a t=0 state and as a check on the producer.
