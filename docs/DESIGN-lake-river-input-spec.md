@@ -150,9 +150,10 @@ belongs to its **downstream** link – `('jcn', s)` is named for the segment *le
 it (`network.py:from_segment_lists`; *"a confluence node is named by the single
 segment leaving it"*) – and in the solver's layout each segment carries all its own
 nodes. So no DOF is ever shared between two labels. See §1.6 for the one exception.
-A node's own region is its extent minus its children's – so a leaf's own region is
-the basin itself, and a meta-depression's own region is just the saddle ground
-between its two children. Those own-regions tile the landscape exactly (this *is*
+
+A *hierarchy* node's own region is its extent minus its children's – so a leaf's
+own region is the basin itself, and a meta-depression's own region is just the
+saddle ground between its two children. Those own-regions tile the landscape exactly (this *is*
 the §1.2 partition), so every link falls in exactly one:
 
 | link | `dep_label` |
@@ -167,19 +168,21 @@ depression, so it joins the depression; at the **sill** its downstream link is t
 river, so it does not – which is correct, since nothing above `out_elev` is stored
 in that depression anyway.
 
-So tributary links do **not** carry duplicate labels of the same depression. Their
-nodes carry *different* labels, and what they share at high water is a **common
-ancestor in the tree**. "Which links are in meta-depression *M*?" is then a subtree query, and membership is derived, never stored twice.
+So tributary links do **not** carry duplicate labels of the same depression. They
+carry *different* labels, and what they share at high water is a **common ancestor
+in the tree**. "Which links are in meta-depression *M*?" is then a subtree query,
+and membership is derived, never stored twice.
 
 **The run-time state.** The filled bodies at any instant are an **antichain** of
-the tree – a set of nodes, none an ancestor of another. Each step:
+the tree – a set of hierarchy nodes, none an ancestor of another. Each step:
 
-1. take the active antichain and each active node's water level (FSM's output);
-2. for each active node *D* at level `z_D`: every DOF whose (inherited) label lies
+1. take the active antichain and each active hierarchy node's water level (FSM's
+   output);
+2. for each active hierarchy node *D* at level `z_D`: every DOF whose (inherited) label lies
    in *D*'s subtree, and whose bed is below `z_D`, joins one body with surface `z_D`;
 3. everything else is river.
 
-A graph junction whose adjacent nodes are all in the same body is not a hydraulic
+A graph junction whose adjacent DOFs are all in the same body is not a hydraulic
 confluence at all – it is an interior point of a flat water surface.
 That is where the *n*-way behaviour comes from: the body groups the links, and the
 graph never changes.
@@ -198,9 +201,9 @@ tributaries `L1, L2 → A` and `L3 → B`.
 unchanged: the producer ships what *can* happen – the hierarchy is every possible
 lake configuration – and FluvTree writes what *is* happening. Stored and immutable:
 `dep_label`, the tree, merge elevations, `A(z)` / `B(x, z)`. Written each step by
-FluvTree: `seg_type`, `z_w`, and the body each node currently belongs to.
+FluvTree: `seg_type`, `z_w`, and the body each DOF currently belongs to.
 
-### 1.6 Short segments: put the label on nodes so the cut becomes optional
+### 1.6 Short segments: cut by default, with a per-node fallback
 
 Depression margins and tributary junctions are both fixed by terrain. When they
 land close together, cutting the graph at the margin leaves a stub segment.
@@ -234,9 +237,11 @@ arrays, so the fallback costs nothing structurally.
 over a measurable *length*, which makes link-to-depression a principled
 extent-against-extent comparison. A bare point has no such measure, so labelling
 "is this node inside the polygon?" would be a knife-edge and would be a genuine
-step down from link assignment.
+step down from link assignment. (This is why §1.5 keeps the label on links; the
+paragraph below records why per-DOF assignment is nonetheless well posed where the
+fallback needs it.)
 
-The node is not a bare point here. It owns an explicit control volume: half the
+A DOF is not a bare point here. It owns an explicit control volume: half the
 upstream spacing plus half the downstream spacing, which the solver computes
 outright – `land = B[1] * 0.5 * ((x[1] - x[0]) + (x[2] - x[1]))`
 (`diffusion.py:284`, and the same form at `188-197`). So the assignment rule is
