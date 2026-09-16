@@ -414,16 +414,31 @@ water-storage query needs the `lambda_p = 0` path. The producer therefore ships
 not a property of the container, and must not be folded into the delivered
 widths.
 
-### 2.4 Hydrology, per node
+### 2.4 Hydrology, per node – optional
 
-11. `A` – contributing drainage area [m²].
+11. `A` – contributing drainage area [m²]. **Optional, and recommended.**
 
-**Deliver area, not only discharge.** FluvTree currently treats `Q` as fixed for
-the run *(verified: `diffusion.py:92`, "Constant-in-time reach state")*. Lakes
-break that: an endorheic basin passes no water downstream until it spills, and
-evaporation removes water. Area is time-invariant and routing-independent;
-discharge is neither. Give FluvTree the invariant quantity and let it recompute
-`Q` as routing changes.
+Contributing area is a property *of* the network, not part of it: it accumulates
+through the topology, and it is an input a particular process needs rather than
+something that makes this a river-and-lake network. By the same test that empties
+§2.6, it is not a required deliverable.
+
+It differs from the §2.6 items in one way worth stating. `S0`, `z_bl` and the rest
+have **no terrain basis** – the producer could not supply them if it tried.
+Contributing area does, and the producer is uniquely placed to supply it: flow
+accumulation is a **byproduct of the routing this spec already requires**, so
+shipping it costs nothing, whereas recovering it later means going back to the DEM.
+A file without it cannot feed the standard solvers unaided.
+
+Hence *optional and recommended*, with one rule: **if it is absent, say so
+explicitly** in the provenance block, so a reader can tell a choice from an
+omission – the same reason `min_depression_filter` records the literal `"none"`.
+
+**If supplied, supply area, not discharge.** FluvTree currently treats `Q` as fixed
+for the run *(verified: `diffusion.py:92`, "Constant-in-time reach state")*, and
+lakes break that – an endorheic basin passes no water downstream until it spills.
+Area is time-invariant and routing-independent; discharge is neither. Give the
+invariant quantity and let `Q` be derived as routing changes.
 
 ### 2.5 The depression hierarchy
 
@@ -517,6 +532,7 @@ two networks are comparable at all.
 
 **(d) Every choice that can change the graph**
 
+    contributing_area        # "supplied" | "absent" — §2.4
     node_convention          # "all_nodes_per_segment" | "interior_plus_endpoints"
                              #   — §2.2; validated against the consuming process
     conditioning_method      # fill | breach | least_cost  (§1.2 completeness)
