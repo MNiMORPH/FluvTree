@@ -467,8 +467,8 @@ two networks are comparable at all.
     flat_resolution          # "richdem:Barnes2014" | "r.watershed:astar"
     tie_break                # "LIFO" (richdem) | "FIFO" (r.watershed)
     stream_threshold, accumulation_units
-    min_depression_criterion, min_depression_value    # §5.3 – still unset
-    snap_tolerance                                    # §5.5 – still unset
+    min_depression_filter    # "none" — recorded explicitly, §5.3
+    # (no snap_tolerance: none is used — §5.5)
     stub_policy, stub_threshold                       # §1.6
     commands                 # the literal invocations, in order, verbatim
 
@@ -494,9 +494,11 @@ to know that before comparing it with anything.
 `n_depressions_dropped_by_filter` follows the standing rule that a filter reports
 what it kept **and** what it removed.
 
-**Two fields have no value yet** – `min_depression_*` (§5.3) and `snap_tolerance`
-(§5.5). The schema slots exist; the numbers are Andy's to set, and the producer
-should refuse to run until they are given rather than fall back to a default.
+**Both formerly-open thresholds are now settled at "none"** (§5.3, §5.5), so the
+producer applies no filter and no snapping. `min_depression_filter` is still
+recorded, with the literal value `"none"` – an absent field would read as an
+omission, and the point of the block is that a reader can tell a decision from a
+gap.
 
 ## 3. What FluvTree must do with it
 
@@ -578,13 +580,41 @@ These are decisions, not defaults. None should be picked silently.
 
 **Still open:**
 
-3. **Minimum depression size.** `dephier` finds every pit, including single-cell
-   DEM noise. A filter is unavoidable, and the criterion – volume, area, depth, or
-   a combination – **is yours to set.** I am not choosing one.
+3. ~~**Minimum depression size.**~~ **Settled: no filter. Every depression the
+   hierarchy finds is kept**, single-cell pits included.
+
+   The filter is not, after all, unavoidable – it is avoidable by moving the
+   decision from the producer to the dynamics. A one-cell pit fills in the first
+   step and stops being a lake, so the criterion becomes *physical* (does it
+   actually fill?) rather than *geometric* (is it bigger than some number?). That
+   is strictly better than a preprocessor guess, and it removes the last invented
+   threshold from the producer.
+
+   Two consequences to watch, neither fatal. **(1)** The tree gains a node per pit,
+   and `A(z)` ships per node, so a noisy lidar DEM produces a large hierarchy –
+   a data-volume and lookup cost, not a correctness one. **(2)** Noise pits sitting
+   in channels will label stream links as depressions at t=0; they self-clear on
+   the first fill. Both are visible through the §2.8 counts, which is why those
+   counts are mandatory.
 4. **Endorheic basins and the ocean.** How `ocean_parent` maps onto the outlet
    boundary, and what a basin that never spills means for downstream `Q`.
-5. **Snapping tolerance.** Sill cells will rarely fall exactly on a stream-reach
-   breakpoint.
+5. ~~**Snapping tolerance.**~~ **Settled: none needed. Place the node at the
+   sill.** The §1.6 measurements are what license this: a node may be inserted
+   arbitrarily close to an existing one without corrupting the answer – conditioning
+   degrades as `1/L` and nothing else does – so there is never a reason to snap a
+   sill to a nearby breakpoint rather than put a node where the sill actually is.
+
+   **What remains is a degeneracy rule, not a tolerance.** The one hard failure the
+   same measurements found is two nodes at the *same* coordinate: zero face length,
+   a divide by zero in `_face_conductance`, an exactly singular matrix. So if a
+   sill coincides with an existing node, use that node – do not insert a second one
+   there. That is an exact-equality check, not a tuned threshold, and it is already
+   constraint 4 of the producer-side validator (§5.8).
+
+   The distinction matters for realistic inputs: sills land on cell centres, so a
+   sill is either *exactly* an existing node or at least a fraction of a cell away,
+   where `cond ~ 1/L` is still far inside double precision. There is no intermediate
+   regime needing a tuned ε.
 6. ~~**Convergence guarantee.**~~ **Settled: the Depression Hierarchy cannot
    produce a divergent depression.** `out_cell`, `out_elev`, `odep` and `parent`
    are each single-valued, `lchild`/`rchild` make it a binary tree, and `flowdirs`
