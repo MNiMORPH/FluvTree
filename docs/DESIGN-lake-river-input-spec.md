@@ -880,16 +880,40 @@ These are decisions, not defaults. None should be picked silently.
    network itself, present with or without depressions – so the §1.6 measurements
    bound its severity but do not remove it. Untouched by any decision above.
 
-## 6. File format
+## 6. File format — GeoPackage, with NetCDF as an optional companion
 
-**One self-describing NetCDF file.** The ragged cross-sections are the awkward
-part, and NetCDF carries them cleanly as flat value arrays plus an `offsets`
-index – mirroring `ValleyGeometry`'s layout exactly. The provenance block of §2.8
-becomes file attributes.
+**One GeoPackage is the canonical file.** It is SQLite underneath, which turns out
+to serve both audiences from one artifact:
 
-Alternative: a directory of Parquet + a JSON manifest. Not recommended: any
-GRASS-native format as the interchange, which would drag GRASS into FluvTree's
-dependencies.
+- **Spatial layers, for people and GIS.** Links as `LineString`, nodes as `Point`,
+  leaf depressions as `Polygon`, meta-depression pour points as `Point` — very
+  nearly what `depressions_to_grass` already builds. The CRS is carried natively and
+  the whole network opens in QGIS. That matters more than it sounds: the join
+  (§4.2 Gap 3) is the piece most likely to be subtly wrong, and being able to *look*
+  at a labelled network over the DEM is the fastest way to catch it.
+- **Aspatial tables, for FluvTree.** GPKG permits ordinary attribute tables
+  alongside the spatial ones, so the ragged payload lives in long form —
+  `(node_id, level, z, B)` and `(dep_label, level, z, A)` — with the hierarchy and
+  the provenance block as further tables.
+
+**The dependency argument decides it.** FluvTree depends on numpy, scipy, networkx
+and matplotlib (`pyproject.toml`). Requiring GDAL, `fiona` or `geopandas` for the
+reader would be a heavy addition for a library whose §3 rule is that it must import
+without GRASS. But if the numeric payload sits in aspatial tables with plain
+columns, **FluvTree reads a GeoPackage with `sqlite3` from the standard library and
+no new dependency at all** — the spatial layers exist for QGIS and never need to be
+parsed by FluvTree. Two audiences, one file, neither needing the other's toolchain.
+
+**NetCDF as an optional companion, not a rival.** Its advantage is real but narrow:
+the ragged `(values, offsets)` layout maps straight onto `ValleyGeometry` with no
+marshalling, and `scipy.io.netcdf_file` reads NetCDF-3 with — again — no new
+dependency, scipy already being required. The case for emitting it arises if the
+long tables prove slow: `B(x, z)` is per node, so a 10⁵-node network with tens of
+levels per node is a table of 10⁶–10⁷ rows, and pulling that through `sqlite3`
+row-wise is the one place this design could bite. **Measure before adding it.**
+
+Ruled out: any GRASS-native format as the interchange, which would drag GRASS into
+FluvTree's dependencies.
 
 ## 7. Open on the FluvTree side
 
@@ -922,4 +946,9 @@ Out of scope for this spec, recorded so they are not lost:
 
 ## 8. Naming
 
-The producer package is unnamed. That is Andy's call.
+**`landgraph`.** Free on PyPI (checked: the project JSON returns 404).
+
+The name is deliberately broader than rivers-and-lakes, and correctly so: what this
+produces is a graph of the land surface, of which the river-and-lake network is the
+first — not the only — thing that can be read off it. Nothing in §2's core tier is
+specific to fluvial process.
