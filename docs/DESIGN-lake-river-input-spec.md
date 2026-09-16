@@ -514,17 +514,38 @@ These are decisions, not defaults. None should be picked silently.
    is *"a value [0,7]"* – one direction per cell
    (`richdem/depressions/depression_hierarchy.hpp:38-80, 269`).
 
-   **But the guarantee is delivered by arbitrary tie-break, not by impossibility**,
-   and the header says so: *"If a depression has more than one outlet at the same
-   level one of them is arbitrarily chosen; hopefully this happens only rarely in
-   natural environments."* The same wording covers `out_cell` at equal elevation
-   and `pit_cell` at equal depth. Flats are likewise forced unique by an imposed
-   ε-gradient (`r.richdem.resolveflats`).
+   **The guarantee is delivered by tie-break, not by impossibility**, and the
+   header says so: *"If a depression has more than one outlet at the same level one
+   of them is arbitrarily chosen; hopefully this happens only rarely in natural
+   environments."* The same wording covers `out_cell` at equal elevation and
+   `pit_cell` at equal depth.
 
-   So the *topological* risk is closed and what survives is a **reporting**
-   obligation, which belongs with provenance (§2.7): the producer should count the
-   depressions whose outlet, pit, or flat direction was resolved by an arbitrary
-   pick, and report that count rather than let it pass silently.
+   **"Arbitrary" here means physically undetermined, not nondeterministic.** The
+   hierarchy is deterministic by explicit design, on two counts
+   (`depression_hierarchy.hpp:395-407`):
+
+   - parallel nondeterminism is removed outright – *"Since the above runs in
+     parallel, the ordering of the seed cells is nondeterministic. Let's fix
+     that."* followed by `std::sort` on both seed lists;
+   - equal-elevation ties follow a **documented LIFO rule** in the radix heap –
+     *"If two or more cells are of equal elevation then the one added last (most
+     recently) is returned from the queue first. This ensures that a single
+     depression gets all the cells within a flat area."* The tie rule is not
+     incidental; it exists so a flat lands wholly in one depression.
+
+   So the same DEM yields the same hierarchy, and reproducibility is not at issue.
+   What survives is **reporting**, and it belongs with provenance (§2.7): the
+   producer should count the outlets, pits, and flat directions decided by a tie
+   rather than by terrain, and report the count. Not because the answer might
+   change between runs – it will not – but because those are the places where the
+   network rests on a convention instead of on the landscape, and a quantised DEM
+   (integer-metre lidar, low-relief glaciated terrain) produces many more of them
+   than *"hopefully ... only rarely"* suggests.
+
+   **Not verified here: `r.watershed`.** GRASS is installed on this machine as a
+   binary only, with no C source, so its flat handling has not been checked. If the
+   producer routes with `r.watershed` rather than RichDEM, that check is
+   outstanding.
 
    One residual, and it is not the hierarchy's: the **stream network** is extracted
    separately, and `r.richdem.flowaccumulation` offers MFD algorithms (D-infinity,
