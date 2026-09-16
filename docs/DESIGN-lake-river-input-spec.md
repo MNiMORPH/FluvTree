@@ -58,7 +58,7 @@ the axis is:
 > V(z) = ∫ Σ B Δx dz' = ∫ A(z') dz' = the true depression volume.
 
 This costs nothing in the solver, which already reads `B` per node and whose
-`storage_volume` is documented as *"per unit valley length"* (`valley.py:151`), so
+`storage_volume` is documented as *"per unit valley length"* (`ValleyGeometry.storage_volume`), so
 the `B · Δx` product is the quantity it already forms.
 
 What the along-axis *distribution* of `A(z)` controls is only **where inside the
@@ -137,7 +137,7 @@ level – a lookup, not a discovery. Tracing the tributary network to partition 
 hierarchy in advance is then unnecessary.
 
 The solver already permits the run-time result: confluence assembly sums over
-`for j in up_ids` with no cap (`diffusion.py:254`), so an *n*-way shared surface
+`for j in up_ids` with no cap (`DiffusionSolver._assemble`), so an *n*-way shared surface
 costs nothing.
 
 ### 1.5 What each link carries, and what FluvTree writes
@@ -244,7 +244,7 @@ fallback needs it.)
 A DOF is not a bare point here. It owns an explicit control volume: half the
 upstream spacing plus half the downstream spacing, which the solver computes
 outright – `land = B[1] * 0.5 * ((x[1] - x[0]) + (x[2] - x[1]))`
-(`diffusion.py:284`, and the same form at `188-197`). So the assignment rule is
+(`DiffusionSolver._assemble`, and the same form in `_compute_land_areas`). So the assignment rule is
 
 > intersect each node's **cell** with the depression own-regions, exactly as one
 > would intersect a link, and assign the cell by its overlap.
@@ -266,9 +266,9 @@ separated by a **face**, and a face is exactly where control volumes meet. The
 solver duplicates the junction value rather than sharing it – *"the confluence
 value is duplicated across the mainstem's first node and each tributary's last
 node, separated by a finite face; junction nodes on the graph are topological
-markers ... not shared `z` degrees of freedom"* (`diffusion.py:18-22`) – and the
+markers ... not shared `z` degrees of freedom"* (`solvers/diffusion` module docstring) – and the
 face sits at the midpoint of the gap (`land = B[-1] * 0.5 * ((x[-1] - x[-2]) +
-(x[dj][0] - x[-1]))`, `diffusion.py:269`).
+(x[dj][0] - x[-1]))`, in `DiffusionSolver._assemble`).
 
 So a margin at `x_m` is represented by **two nodes bracketing it**, at
 `x_m - δ/2` and `x_m + δ/2`: the upstream cell is then wholly outside the
@@ -357,12 +357,12 @@ that enforces them.
 1. `seg_id` – integer, stable.
 2. `upstream_segment_IDs`, `downstream_segment_IDs` – the form
    `RiverNetwork.from_segment_lists` takes.
-3. **At most one downstream segment.** *(verified: `network.py:161` raises
+3. **At most one downstream segment.** *(verified: `RiverNetwork.downstream_segment` raises
    "non-convergent topology".)* The joined graph must still be a convergent tree.
    This is the locked FluvTree invariant (`DESIGN-structure-and-naming.md`, Scope),
    and lakes must not break it.
-4. **One outlet.** *(verified: `network.py:111`, `diffusion.py:122`,
-   `advection.py:34,45` all take `mouth_segments()[0]`.)* Multiple outlets are not
+4. **One outlet.** *(verified: `RiverNetwork.from_arrays`, `DiffusionSolver.__init__`, and
+   `advection.sweep_order` / `incise_n1_step` all take `mouth_segments()[0]`.)* Multiple outlets are not
    supported today; see §7.
 5. `dep_label` – **per link**, the hierarchy node whose **own region** contains it,
    per §1.5; null outside every depression. Per node only on an uncut margin
@@ -375,7 +375,7 @@ that enforces them.
 
 6. `x` – along-flow distance [m], monotonic.
 7. `z_bed` – bed or basin-floor elevation [m].
-8. **Node-count minima.** *(verified: `diffusion.py:174,179`.)* A segment
+8. **Node-count minima.** *(verified: `DiffusionSolver._check_confluence_sizes`.)* A segment
    downstream of a confluence needs ≥ 3 nodes; a tributary entering a confluence
    needs ≥ 2. The producer must honour this when it chooses breakpoints, or
    FluvTree raises at solver construction.
@@ -414,7 +414,7 @@ modelling choice, not a property of the terrain.
 ### 2.3 Cross-section geometry, per node, ragged — *core*
 
 9. `z_levels`, `B_levels` – ascending `z`, paired widths. **≥ 2 levels per node**
-   *(verified: `valley.py:51`.)*
+   *(verified: `ValleyGeometry.__init__`.)*
 10. `channel_width` – the backup width below the lowest tabulated level.
 
 Store these as flat `z`, flat `B`, plus an `offsets` index. That is exactly
@@ -423,7 +423,7 @@ Store these as flat `z`, flat `B`, plus an `offsets` index. That is exactly
 **The same table serves water and sediment, at two different porosities.** A
 depression fills with water *or* with sediment through the identical `B(x, z)`
 curve; only the solid fraction differs. `ValleyGeometry` bakes `(1 - lambda_p)`
-into both `storage_volume` and `storage_jacobian` (`valley.py:149,181`), so a
+into both `storage_volume` and `storage_jacobian` (`ValleyGeometry.storage_jacobian` / `.storage_volume`), so a
 water-storage query needs the `lambda_p = 0` path. The producer therefore ships
 **one geometry and no porosity** – `lambda_p` is FluvTree's sediment parameter,
 not a property of the container, and must not be folded into the delivered
@@ -458,7 +458,7 @@ compute. Cheapness is why these particular ones are worth attaching at creation
 time; it is not what makes them optional.
 
 **If supplied, supply area, not discharge.** FluvTree currently treats `Q` as fixed
-for the run *(verified: `diffusion.py:92`, "Constant-in-time reach state")*, and
+for the run *(verified: `DiffusionSolver.__init__`, "Constant-in-time reach state")*, and
 lakes break that – an endorheic basin passes no water downstream until it spills.
 Area is time-invariant and routing-independent; discharge is neither. Give the
 invariant quantity and let `Q` be derived as routing changes.
@@ -470,7 +470,7 @@ without argument if unwanted:
 12. **Sinuosity per link** – the planform length of the polyline over the
     straight-line distance between its ends. `DiffusionSolver` already takes
     `sinuosity` as a physics parameter and currently **defaults it to 1**
-    (`diffusion.py:78`), where it enters `C0` as `sinuosity**-p`. The producer holds
+    (`DiffusionSolver.__init__`), where it enters `C0` as `sinuosity**-p`. The producer holds
     the actual polyline and can measure it. This is the strongest candidate: a real
     parameter FluvTree is presently guessing.
 13. **Shreve / Strahler order per link** – pure topology, free once the graph exists,
@@ -520,7 +520,7 @@ part of it, and none of them is a terrain product:
 - `x_bl` – where the outlet ghost node sits. This looks geometric, but it is part of
   *how base level is imposed*, not of the terrain: it says where the condition is
   applied. The solver already defaults it by linear extrapolation
-  (`diffusion.py`: `2 * x[-1] - x[-2]` when absent).
+  (`DiffusionSolver._assemble`: `2 * x[-1] - x[-2]` when absent).
 - **Initial water state** – how much water each depression holds at `t = 0`. It is
   "what *is* happening", which §1.5 assigns to FluvTree, and deriving it needs a
   water input that is itself a modelling choice. Recorded in §7.
@@ -666,7 +666,7 @@ Route (a) needs no C++ change and is the one to try first.
 `r.watershed` + `r.stream.extract` + `v.stream.network`, prototyped in this repo's
 own `scripts/drainageNetworkGRASS.py`. That file is a working note, not a
 producer: it hard-codes catchment cats (985, 1258), a stream threshold of 3000 and
-an accumulation cut of 1e7, and line 50 is a bare shell invocation
+an accumulation cut of 1e7, and its `v.stream.profiler` step is a bare shell invocation
 (`v.stream.profiler cat=1258 …`) that is not valid Python – flagged in the file
 itself by the preceding comment, "Run in shell or rewrite". It needs rewriting.
 
@@ -809,7 +809,8 @@ These are decisions, not defaults. None should be picked silently.
    produce a divergent depression.** `out_cell`, `out_elev`, `odep` and `parent`
    are each single-valued, `lchild`/`rchild` make it a binary tree, and `flowdirs`
    is *"a value [0,7]"* – one direction per cell
-   (`richdem/depressions/depression_hierarchy.hpp:38-80, 269`).
+   (`struct Depression` and `GetDepressionHierarchy`,
+   `richdem/depressions/depression_hierarchy.hpp`).
 
    **The guarantee is delivered by tie-break, not by impossibility**, and the
    header says so: *"If a depression has more than one outlet at the same level one
@@ -819,7 +820,7 @@ These are decisions, not defaults. None should be picked silently.
 
    **"Arbitrary" here means physically undetermined, not nondeterministic.** The
    hierarchy is deterministic by explicit design, on two counts
-   (`depression_hierarchy.hpp:395-407`):
+   (`GetDepressionHierarchy`):
 
    - parallel nondeterminism is removed outright – *"Since the above runs in
      parallel, the ordering of the seed cells is nondeterministic. Let's fix
@@ -865,7 +866,7 @@ These are decisions, not defaults. None should be picked silently.
 
    - **`-s` is required.** The manual is explicit – *"SFD (D8) flow (default is
      MFD)"* – so the **default is multiple-flow-direction** and would break the
-     convergence requirement above. (`scripts/drainageNetworkGRASS.py:41` already
+     convergence requirement above. (its `r.watershed` call already
      passes `flags='s'`, so the prototype is correct on this point.)
    - **`-b` must not be used.** *"Beautify flat areas: Flow direction in flat areas
      is modified to look prettier"* – a cosmetic alteration of exactly the flow
