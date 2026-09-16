@@ -417,7 +417,9 @@ a position on a reach.
 22. `x`, `y` per node, and the CRS.
 23. **Provenance block**: DEM source and resolution, computational region,
     RichDEM / `r.richdem` versions, and **every threshold applied, with the count
-    of features it kept and dropped**.
+    of features it kept and dropped**. Include the **arbitrary-tie-break counts**
+    per §5.6 – outlets, pit cells, and flat directions resolved by an arbitrary
+    pick – and the flow-routing algorithm used, which must be single-direction.
 
 ## 3. What FluvTree must do with it
 
@@ -506,9 +508,29 @@ These are decisions, not defaults. None should be picked silently.
    boundary, and what a basin that never spills means for downstream `Q`.
 5. **Snapping tolerance.** Sill cells will rarely fall exactly on a stream-reach
    breakpoint.
-6. **Convergence guarantee.** A depression spilling toward two neighbours, or an
-   ambiguously routed flat, breaks the convergent-tree invariant. The join needs
-   an explicit check and a documented resolution rule, not a silent pick.
+6. ~~**Convergence guarantee.**~~ **Settled: the Depression Hierarchy cannot
+   produce a divergent depression.** `out_cell`, `out_elev`, `odep` and `parent`
+   are each single-valued, `lchild`/`rchild` make it a binary tree, and `flowdirs`
+   is *"a value [0,7]"* – one direction per cell
+   (`richdem/depressions/depression_hierarchy.hpp:38-80, 269`).
+
+   **But the guarantee is delivered by arbitrary tie-break, not by impossibility**,
+   and the header says so: *"If a depression has more than one outlet at the same
+   level one of them is arbitrarily chosen; hopefully this happens only rarely in
+   natural environments."* The same wording covers `out_cell` at equal elevation
+   and `pit_cell` at equal depth. Flats are likewise forced unique by an imposed
+   ε-gradient (`r.richdem.resolveflats`).
+
+   So the *topological* risk is closed and what survives is a **reporting**
+   obligation, which belongs with provenance (§2.7): the producer should count the
+   depressions whose outlet, pit, or flat direction was resolved by an arbitrary
+   pick, and report that count rather than let it pass silently.
+
+   One residual, and it is not the hierarchy's: the **stream network** is extracted
+   separately, and `r.richdem.flowaccumulation` offers MFD algorithms (D-infinity,
+   Quinn, Holmgren) alongside D8. The hierarchy's convergence guarantee does not
+   extend to an MFD extraction. **Stream-network extraction must be
+   single-flow-direction.**
 7. **Tributary junctions falling close together.** A property of the drainage
    network itself, present with or without depressions – so the §1.6 measurements
    bound its severity but do not remove it. Untouched by any decision above.
