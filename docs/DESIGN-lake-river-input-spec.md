@@ -445,9 +445,17 @@ accumulation is a **byproduct of the routing this spec already requires**, so
 shipping it costs nothing, whereas recovering it later means going back to the DEM.
 A file without it cannot feed the standard solvers unaided.
 
-Hence *optional and recommended*, with one rule: **if it is absent, say so
-explicitly** in the provenance block, so a reader can tell a choice from an
-omission – the same reason `min_depression_filter` records the literal `"none"`.
+Hence *optional and recommended*, with one rule that generalises to every
+attribute in this section: **the file declares which optional attributes it
+carries**, as an explicit `optional_attributes` list in the provenance block. A
+reader branches on that list rather than probing for variables, and an empty list
+says "none, deliberately" rather than leaving absence ambiguous – the same reason
+`min_depression_filter` records the literal `"none"`.
+
+The criterion for this section is membership, not cost: **an attribute is optional
+because it is not part of the network graph**, whatever it happened to cost to
+compute. Cheapness is why these particular ones are worth attaching at creation
+time; it is not what makes them optional.
 
 **If supplied, supply area, not discharge.** FluvTree currently treats `Q` as fixed
 for the run *(verified: `diffusion.py:92`, "Constant-in-time reach state")*, and
@@ -570,7 +578,9 @@ two networks are comparable at all.
 
 **(d) Every choice that can change the graph**
 
-    contributing_area        # "supplied" | "absent" — §2.4
+    optional_attributes      # explicit list of §2.4 attributes present,
+                             #   e.g. ["A", "sinuosity"]; [] means none, and
+                             #   means it deliberately, not by omission
     node_convention          # "all_nodes_per_segment" | "interior_plus_endpoints"
                              #   — §2.2; validated against the consuming process
     conditioning_method      # fill | breach | least_cost  (§1.2 completeness)
