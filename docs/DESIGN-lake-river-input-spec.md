@@ -487,11 +487,18 @@ package that **depends on** `r.richdem` for the depression side keeps both hones
 
 These are decisions, not defaults. None should be picked silently.
 
-1. **Breakpoints.** Segments break at confluences; do they also break at lake
-   margins and at sills? (Almost certainly yes, but it interacts with the
-   node-count minima in §2.2.)
-2. **Leaf depression → one lake segment.** A *meta*-depression is then not a
-   segment at all: it is a potential future merge, carried in the tree.
+**Settled during design** – kept here so the list is not read as still open:
+
+1. ~~**Breakpoints.**~~ **Settled: cut at margins and sills by default**, bracketing
+   the margin with two nodes rather than landing one on it; decline the cut where
+   it would leave a stub beside a junction and carry a per-node label array on the
+   spanning segment instead (§1.6).
+2. ~~**Leaf depression → one lake segment.**~~ **Settled**: links at leaf
+   granularity, meta-depressions are groupings of links rather than links of their
+   own (§1.2).
+
+**Still open:**
+
 3. **Minimum depression size.** `dephier` finds every pit, including single-cell
    DEM noise. A filter is unavoidable, and the criterion – volume, area, depth, or
    a combination – **is yours to set.** I am not choosing one.
@@ -502,6 +509,9 @@ These are decisions, not defaults. None should be picked silently.
 6. **Convergence guarantee.** A depression spilling toward two neighbours, or an
    ambiguously routed flat, breaks the convergent-tree invariant. The join needs
    an explicit check and a documented resolution rule, not a silent pick.
+7. **Tributary junctions falling close together.** A property of the drainage
+   network itself, present with or without depressions – so the §1.6 measurements
+   bound its severity but do not remove it. Untouched by any decision above.
 
 ## 6. File format
 
