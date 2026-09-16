@@ -656,28 +656,45 @@ These are decisions, not defaults. None should be picked silently.
    cost, not a correctness one) and noise pits briefly labelling channel links as
    depressions at t=0 – are both visible through the §2.8 counts, which is part of
    why those counts are mandatory.
-4. **Endorheic basins and the ocean.** How `ocean_parent` maps onto the outlet
-   boundary, and what a basin that never spills means for downstream `Q`.
+4. ~~**Endorheic basins and the ocean.**~~ **Settled.**
 
-   *Determined so far.* **Endorheic-ness is dynamics, not topology.** Because §1.2
-   requires a *complete* network, conditioning already supplies an outflow path over
-   every rim, so an endorheic basin is not a second terminus – it is simply a
-   depression whose level never reaches its sill, leaving its outflow link unused.
-   That falls out of FSM and needs nothing from the producer. The ocean maps onto
-   the single outlet, and `ocean_parent` / ocean-linkage already ship (§2.5 item 17).
+   **Endorheic-ness is dynamics, not topology.** Because §1.2 requires a *complete*
+   network, conditioning already supplies an outflow path over every rim, so an
+   endorheic basin is not a second terminus – it is a depression whose level never
+   reaches its sill, leaving its outflow link unused. That falls out of FSM and asks
+   nothing of the producer. The ocean maps onto the outlet, and `ocean_parent` /
+   ocean-linkage already ship (§2.5 item 17).
 
-   *But a dry link is not representable.* Measured on a three-segment chain with the
-   middle segment's `Q` driven to zero:
+   **A lake cannot spill across a catchment divide.** The divide is *defined by* the
+   routing, so a lake whose lowest escape leads into the neighbouring basin simply
+   has the divide drawn the other way; the hierarchy already takes `out_elev` as the
+   lowest rim point, so the two are consistent by construction. Either the sill lies
+   below the divide and the lake drains within its own catchment, or the lake is
+   endorheic with respect to it. Inter-catchment spilling is therefore not a
+   configuration a consistently-computed network can hold, and **multi-outlet
+   support is not forced by it**.
 
-   | `Q` on the middle link | result |
-   |---|---|
-   | 10, 1e-3, 1e-9 | finite, correct |
-   | **0** | `Matrix is exactly singular`, **z all NaN**, warnings only |
+   Proglacial outlet switching is real, but it is driven by ice-margin and
+   land-surface elevation change – *terrain* change, not water-level change. That
+   means recomputing the catchment, i.e. re-running the producer.
 
-   The interior stencil divides by `Q[i]` (`dQ_2c / Q[i]`), so discharge must be
-   strictly positive. "Endorheic = set `Q = 0` downstream" is therefore not
-   available, and the choice between a positive floor and excluding inactive links
-   from the assembly is open – the latter is the same machinery as §7.2.
+   **Sea level: cut, do not recompute – when it is inundation.** A falling sea level
+   exposes shelf and extends the network seaward; a rising one drowns the lower
+   network. Both are handled by the machinery already built: compute the network
+   once over the **maximal subaerial extent** (the lowest stand of interest, so the
+   DEM must carry bathymetry to that depth) and treat sea level as **just another
+   water level**. The ocean is then the outermost water body, `ocean_parent` becomes
+   *derived* rather than static exactly as `seg_type` is, and a depression below the
+   current stand is a bay while the same depression above it is a lake. No new
+   mechanism.
+
+   The honest limit, and it is the same one as above: this handles **inundation**,
+   not **deformation**. Isostatic rebound, shelf deposition and the erosion of
+   exposed shelf change the terrain itself, and terrain change means a re-run.
+
+   **The general rule this yields:** *level changes are handled by the hierarchy;
+   terrain changes require re-running the producer.*
+
 5. ~~**Snapping tolerance.**~~ **Settled: none needed. Place the node at the
    sill.** The §1.6 measurements are what license this: a node may be inserted
    arbitrarily close to an existing one without corrupting the answer – conditioning
@@ -824,11 +841,20 @@ Out of scope for this spec, recorded so they are not lost:
    progradation. A modelling choice, not a numerical one.
 6. **Every boundary condition** (§2.6), including the ones currently read off
    `RiverNetwork.from_arrays`: `S0` / `Q_s_0`, `z_bl`, `x_bl`.
-7. **Initial water state**, and the ongoing water input. FSM needs to be told how
+7. **A link with no flow.** The interior stencil divides by `Q[i]`, so discharge
+   must be strictly positive – measured on a three-segment chain, `Q` of 1e-9 is
+   fine but `Q = 0` gives `Matrix is exactly singular` and `z` all NaN, with
+   warnings only. The producer never emits this: it ships contributing *area*,
+   which is terrain and always positive. But whatever couples FSM to the solver
+   must decide between a positive floor and excluding inactive links from the
+   assembly – the latter being the same machinery as item 2.
+8. **Initial water state**, and the ongoing water input. FSM needs to be told how
    much water is in the system – `r.richdem.fsm` takes a `water_depth` – and
    nothing currently supplies it: `z_w` appears in this spec only as a field
    FluvTree *writes*. Both the `t = 0` volume per depression and the per-step
-   runoff forcing are modelling inputs.
+   runoff forcing are modelling inputs. Evaporation, which a closed basin needs,
+   belongs further out still – it is a property of a model that *uses* this graph,
+   not of FluvTree and certainly not of the graph.
 
 ## 8. Naming
 
