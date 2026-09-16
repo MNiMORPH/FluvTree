@@ -109,7 +109,11 @@ tests/  docs/  pyproject.toml
     (`from_segment_lists`, `from_arrays`). Construction lives with the structure.
   - *synthesis* (invented from parameters: arbitrary/random networks, idealized
     profiles) → `generate/` (planned).
-  - *loading* (from data: DEM, measured sections) → `io/` (planned).
+  - *loading* (from data: DEM, measured sections) → `io/` (planned). The DEM path is
+    **not** FluvTree's: a separate producer, **LandGraph**, turns a DEM into a
+    combined river-and-lake network and emits a GeoPackage that `io/` reads. The
+    file format, and the design history behind it, live in LandGraph's
+    `docs/SPEC-network-file.md`.
   `build_network` is the convenience alias for `RiverNetwork.from_arrays`.
 
 ## Locked names
