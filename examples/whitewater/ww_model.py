@@ -21,10 +21,22 @@ INTERMIT = 4.77 / Q2_BEAVER          # 0.0502
 
 # --- valley width ----------------------------------------------------------
 # B in the solver is the width sediment is spread over — the VALLEY, not the
-# channel. (An earlier version of this script used the closure's channel_width,
-# which is a diagnostic, not this. That made the bed roughly an order of
-# magnitude too responsive.) Ramped linearly along the network.
-B_UPSTREAM, B_MOUTH = 500.0, 1000.0
+# channel. (An earlier version used the closure's channel_width, a diagnostic,
+# which made the bed roughly an order of magnitude too responsive.)
+#
+# Links, identified from streams_all by gauge position:
+#   6  Middle Fork — the mainstem above Elba; sand starts ~1 km above Elba
+#   14 North Fork  (USGS 05376000 sits 77 m from it), lower 5 km
+#   8  South Fork, lower 5 km
+#   16 Elba -> South Fork confluence      17,19,20 mainstem to the mouth
+#   18 Beaver Creek (joins 0.67 km N of gauge 05376800, "0.5 mi above its mouth")
+#   15 Trout Creek
+MAINSTEM = (6, 16, 17, 19, 20)
+B_MAINSTEM = (500.0, 1000.0)      # ramped along the mainstem, upstream -> mouth
+B_TROUT    = (50.0, 200.0)        # ramped along Trout Creek
+B_FIXED    = {14: 200.0, 8: 200.0, 18: 200.0}     # forks and Beaver Creek
+CLIP_M     = {14: 5000.0, 8: 5000.0, 6: 1000.0}   # lower 5 km of each fork; 1 km
+                                                  # of Middle Fork above Elba
 D, MANN, TAU = 0.3e-3, 0.03, 5.0     # the values in FluvTree's own sand tests
 CLOSURE = SandClosure(D=D, n=MANN, tau_crit_bank=TAU)
 
@@ -55,7 +67,7 @@ def pava_decreasing(y, w=None):
 
 
 def make(json_path, dx=100.0):
-    order, idx, to, up, segs = build(json_path, dx=dx)
+    order, idx, to, up, segs = build(json_path, dx=dx, clip=CLIP_M)
     up_ids   = [[idx[u] for u in up.get(c, [])] for c in order]
     down_ids = [[idx[to[c]]] if to[c] != 0 else [] for c in order]
 
@@ -69,9 +81,19 @@ def make(json_path, dx=100.0):
     S_reach = [float((z_iso[i][0] - z_iso[i][-1]) / (x[i][-1] - x[i][0]))
                for i in range(len(order))]
 
-    # Valley width, ramped linearly from the upstream end of the network to the mouth.
-    x_up = min(float(xx[0]) for xx in x)
-    B = [B_UPSTREAM + (B_MOUTH - B_UPSTREAM) * (xx - x_up) / (0.0 - x_up) for xx in x]
+    # Valley width, per link.
+    ms = [i for i, c in enumerate(order) if c in MAINSTEM]
+    x_ms = min(float(x[i][0]) for i in ms)
+    B = []
+    for i, c in enumerate(order):
+        if c in B_FIXED:
+            B.append(np.full_like(x[i], B_FIXED[c]))
+        elif c == 15:                                   # Trout Creek
+            f = (x[i] - x[i][0]) / (x[i][-1] - x[i][0])
+            B.append(B_TROUT[0] + (B_TROUT[1] - B_TROUT[0]) * f)
+        else:                                           # mainstem
+            f = (x[i] - x_ms) / (0.0 - x_ms)
+            B.append(B_MAINSTEM[0] + (B_MAINSTEM[1] - B_MAINSTEM[0]) * f)
 
     # head slope from the local bed, outlet base level from the DEM
     # INITIAL CONDITION. The raw DEM trace cannot be used directly: 25% of its

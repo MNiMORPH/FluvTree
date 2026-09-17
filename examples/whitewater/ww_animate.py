@@ -8,7 +8,8 @@ from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 SP = "/tmp/claude-1000/-home-awickert-models-FluvTree/4fd69dbf-d3b7-42b4-aeb8-7a9098b98b09/scratchpad"
 D = pickle.load(open(f"{SP}/ww_frames.pkl", "rb"))
-J = json.load(open(f"{SP}/wwsand2m.json"))
+NET = sys.argv[2] if len(sys.argv) > 2 else f"{SP}/wwsand3.json"
+J = json.load(open(NET))
 frames, zs, X, order = D["frames"], D["z_steady"], D["x"], D["order"]
 DAM_A, DAM_B, DAM_RISE = D["dam"]
 QA, QB, QF = D["qchange"]
@@ -33,11 +34,12 @@ mean_series = [float(np.mean(np.concatenate([a - b for a, b in zip(f["z"], zs)])
 tt = np.array([f["year"] for f in frames])
 
 fig = plt.figure(figsize=(12.8, 7.2), facecolor="white")
-gs = fig.add_gridspec(2, 2, width_ratios=[2.25, 1], height_ratios=[2.5, 1],
-                      left=0.058, right=0.995, top=0.865, bottom=0.085,
-                      wspace=0.13, hspace=0.42)
+gs = fig.add_gridspec(3, 2, width_ratios=[2.25, 1], height_ratios=[1.45, 1.25, 0.85],
+                      left=0.058, right=0.995, top=0.865, bottom=0.075,
+                      wspace=0.13, hspace=0.50)
 axP = fig.add_subplot(gs[0, 0])       # long profile
-axT = fig.add_subplot(gs[1, 0])       # time series
+axD = fig.add_subplot(gs[1, 0])       # deviation from steady state
+axT = fig.add_subplot(gs[2, 0])       # time series
 axM = fig.add_subplot(gs[:, 1])       # map, full height
 
 # --- static: long profile reference ---------------------------------------
@@ -46,7 +48,7 @@ for i in range(len(order)):
 allz = np.concatenate(zs)
 axP.set_xlim(min(x.min() for x in X) / 1000 - 0.4, 0.6)
 axP.set_ylim(allz.min() - 2.0, allz.max() + 5.0)
-axP.set_xlabel("distance from the mouth (km)", fontsize=10, color=MUTED)
+axP.tick_params(labelbottom=False)
 pool_line, = axP.plot([], [], lw=1.6, color=POOL, zorder=5)
 pool_fill = [None]
 dam_note = axP.text(0.42, 0.055, "", transform=axP.transAxes, fontsize=9.5,
@@ -64,6 +66,22 @@ axP.legend(loc="upper right", frameon=False, fontsize=9.5, labelcolor=INK)
 lines = [axP.plot([], [], lw=2.2, color=INK, solid_capstyle="round", zorder=4)[0]
          for _ in order]
 fills = [None] * len(order)
+
+# --- static: deviation from steady state ----------------------------------
+axD.axhline(0, lw=1.0, color=MUTED, zorder=1)
+dlines = [axD.plot([], [], lw=2.0, color=AGG, solid_capstyle="round", zorder=3)[0]
+          for _ in order]
+dfills = [None] * len(order)
+axD.set_xlim(axP.get_xlim())
+axD.set_ylim(-0.3, dzmax * 1.12)
+axD.set_ylabel("sediment stored (m)", fontsize=9.5, color=MUTED)
+axD.set_xlabel("distance from the mouth (km)", fontsize=9.5, color=MUTED)
+axD.tick_params(labelsize=8.5, colors=MUTED)
+axD.grid(axis="y", color="#ededed", lw=0.8); axD.set_axisbelow(True)
+for sp in ("top", "right"): axD.spines[sp].set_visible(False)
+for sp in ("left", "bottom"): axD.spines[sp].set_color("#d0d0d0")
+axD.set_title("thickness of fill, reach by reach", fontsize=10.5, color=INK,
+              loc="left", pad=5)
 
 # --- static: map -----------------------------------------------------------
 for i in range(len(order)):
@@ -85,7 +103,8 @@ cb.ax.tick_params(labelsize=8, colors=MUTED); cb.outline.set_visible(False)
 # --- static: time series ---------------------------------------------------
 axT.axvspan(tt.min(), PULSE_END, color=AGG, alpha=0.15, lw=0)
 axT.axvspan(DAM_A, DAM_B, color=POOL, alpha=0.30, lw=0)
-axT.axvspan(QA, QB, color=FLOW, alpha=0.26, lw=0)
+axT.axvspan(QA, QB, color=FLOW, alpha=0.26, lw=0)          # the ramp
+axT.axvspan(QB, tt.max(), color=FLOW, alpha=0.11, lw=0)    # held, not ended
 axT.plot(tt, mean_series, lw=2.0, color=AGG)
 axT.set_xlim(tt.min(), tt.max()); axT.set_ylim(-0.12, max(mean_series) * 1.12)
 axT.set_xlabel("year", fontsize=9, color=MUTED)
@@ -99,8 +118,9 @@ axT.text(tt.min() + 8, max(mean_series) * 0.93, "supply pulse", ha="left",
 axT.annotate("lock and dam", xy=(DAM_B, max(mean_series) * 0.42),
              xytext=(DAM_B + 62, max(mean_series) * 0.26), fontsize=9.5, color=POOL,
              arrowprops=dict(arrowstyle="->", color=POOL, lw=1.1))
-axT.annotate(f"discharge +{100*(QF-1):.0f}%", xy=(QB, max(mean_series) * 0.62),
-             xytext=(QB + 62, max(mean_series) * 0.70), fontsize=9.5, color=FLOW,
+axT.annotate(f"discharge to +{100*(QF-1):.0f}%, then held",
+             xy=(QB + 40, max(mean_series) * 0.55),
+             xytext=(QB + 70, max(mean_series) * 0.72), fontsize=9.5, color=FLOW,
              arrowprops=dict(arrowstyle="->", color=FLOW, lw=1.1))
 marker, = axT.plot([], [], "o", ms=7, color=INK, zorder=5)
 
@@ -117,6 +137,11 @@ def update(k):
         fills[i] = axP.fill_between(X[i] / 1000, zs[i], f["z"][i],
                                     color=AGG, alpha=0.55, lw=0, zorder=3)
         segsM[i].set_array(dz[i])
+        dlines[i].set_data(X[i] / 1000, dz[i])
+        if dfills[i] is not None:
+            dfills[i].remove()
+        dfills[i] = axD.fill_between(X[i] / 1000, 0, dz[i], color=AGG,
+                                     alpha=0.35, lw=0, zorder=2)
     marker.set_data([f["year"]], [mean_series[k]])
 
     # the navigation pool at the mouth
@@ -139,7 +164,7 @@ def update(k):
     sub.set_text(f"{f['year']:.0f}    ·    mean {mean_series[k]:+.2f} m stored"
                  f"    ·    peak {max(float(np.max(d)) for d in dz):+.2f} m"
                  + (f"    ·    Q x{q:.2f}" if q > 1.001 else ""))
-    return lines + segsM + [marker]
+    return lines + dlines + segsM + [marker]
 
 ani = FuncAnimation(fig, update, frames=len(frames), interval=70, blit=False)
 out = sys.argv[1] if len(sys.argv) > 1 else f"{SP}/whitewater_sand.mp4"

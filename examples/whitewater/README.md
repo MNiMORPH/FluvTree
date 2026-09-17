@@ -9,13 +9,13 @@ less. The river then has until
 
 | year | mean stored | peak | base level | Q |
 |---|---|---|---|---|
-| 1932 (pre-dam) | +3.08 m | +3.24 m | — | ×1.00 |
-| 1940 | +3.43 m | +3.60 m | +1.00 m | ×1.00 |
-| 1990 | +3.40 m | +3.64 m | +1.00 m | ×1.10 |
-| 2030 | +3.34 m | +3.64 m | +1.00 m | ×1.20 |
-| 2360 | **+2.99 m** | +3.64 m | +1.00 m | ×1.20 |
+| 1932 (pre-dam) | +3.14 m | +3.24 m | — | ×1.00 |
+| 1940 | +3.49 m | +3.60 m | +1.00 m | ×1.00 |
+| 1990 | +3.46 m | +3.65 m | +1.00 m | ×1.10 |
+| 2030 | +3.33 m | +3.64 m | +1.00 m | ×1.20 |
+| 2360 | **+2.34 m** | +3.40 m | +1.00 m | ×1.20 |
 
-**The valley keeps almost all of it** — 0.44 m removed in 420 years. That is the
+**The valley keeps most of it** — 1.15 m removed in 420 years, from a peak of 3.49 m. That is the
 result of taking the valley width seriously (below): the bed diffusivity is low
 enough that a metres-thick alluvial fill is effectively permanent on human
 timescales. It is also what the Whitewater shows: the post-settlement alluvium is
@@ -46,9 +46,34 @@ python3 ww_animate.py  out.mp4           # render
 
 ## The network
 
-Five links, 36 km, three heads and two binary junctions, one outlet. Reach slopes
-0.00053–0.00279, contributing areas 30–830 km². Trout Creek enters as one of the
-tributaries.
+Nine links, five heads, one outlet. Reaches identified from `streams_all` by gauge
+position, not by guessing from direction:
+
+| cat | reach | extent | valley width |
+|---|---|---|---|
+| 6 | Middle Fork — the mainstem above Elba | lowest 1 km | 500 m (ramp start) |
+| 14 | **North Fork** — USGS 05376000 sits 77 m from it; its 270 km² matches the gauge's stated 101 mi² = 262 km² | lowest 5 km | 200 m |
+| 8 | South Fork | lowest 5 km | 200 m |
+| 16 | Elba → South Fork confluence | full | ramp |
+| 17, 19, 20 | mainstem to the mouth | full | ramp to 1000 m |
+| 18 | **Beaver Creek** — joins 0.67 km north of gauge 05376800, described as "0.5 mi above mouth of Beaver Creek" | full | 200 m |
+| 15 | Trout Creek | full | 50 → 200 m |
+
+The sand reach begins ~1 km above Elba on the Middle Fork, so the forks join *inside*
+the modelled domain.
+
+## Head sediment supply is pinned as a FLUX, not a slope
+
+FluvTree's head boundary is a slope `S0`, and the flux it implies is
+`Q_s = k_Qs · I · Q · S0^p` — **proportional to Q**. So raising discharge 20% with
+`S0` fixed silently raises the upstream sediment supply by 20% too, which is not what
+"supply reverts to pre-disturbance" means: upland sediment yield is set by land use,
+not by how much water the river carries.
+
+The scenario therefore pins `Q_s` at its pre-disturbance value and recomputes `S0`
+from it whenever `Q` changes. This is not cosmetic — it roughly triples what the
+river removes, from 0.44 m to **1.15 m** over 420 years, because the extra water now
+does net erosive work instead of arriving with proportionally more sediment.
 
 ## Choices that had to be made, and why
 

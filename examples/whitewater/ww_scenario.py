@@ -68,9 +68,23 @@ Q0 = [q.copy() for q in sol.Q]
 _slope = (_fb - _fa) / (_yb - _ya)
 Q_ZERO_YEAR = _ya - (_fa - 1.0) / _slope          # 1950
 
+# Head sediment supply must be held at its PRE-DISTURBANCE value.
+# FluvTree's head boundary is a SLOPE, S0, and the flux it implies is
+#     Q_s = k_Qs * I * Q * S0**p
+# — proportional to Q. So raising discharge 20% with S0 fixed silently raises the
+# upstream sediment supply 20% as well, which is not what "supply reverts to the
+# pre-disturbance input" means. Upland sediment yield is set by land use, not by
+# how much water the river happens to carry. So the flux is pinned instead, and S0
+# is recomputed from it whenever Q changes.
+HEADS = [i for i in range(len(sol._segs)) if sol._S0[i] is not None]
+QS0_HEAD = {i: (CLOSURE.k_Qs * INTERMIT * sol.Q[i][0] * sol._S0[i] ** CLOSURE.p)
+            for i in HEADS}
+
 def set_discharge(year):
     scale = float(np.clip(_fa + _slope * (year - _ya), 1.0, _fb))
     sol.Q = [q * scale for q in Q0]          # B deliberately NOT rescaled
+    for i in HEADS:                          # hold the sediment FLUX, not the slope
+        sol._S0[i] = sol._S0_from_Qs0(QS0_HEAD[i], sol.Q[i][0])
     return scale
 
 def base_level(year):

@@ -3,7 +3,9 @@ import json, numpy as np
 
 DX = 100.0          # node spacing [m]
 
-def build(path, dx=DX):
+def build(path, dx=DX, clip=None):
+    """clip: {cat: km} — keep only the lowest `km` of that link."""
+    clip = clip or {}
     d = json.load(open(path))
     links = {l["source"]: l for l in d["links"]}
     to = {l["source"]: l["target"] for l in d["links"]}
@@ -27,6 +29,13 @@ def build(path, dx=DX):
     for c in order:
         L = links[c]
         s = np.asarray(L["s_downstream"], float); s = s - s[0]
+        keep = clip.get(c)
+        if keep is not None:                       # retain only the lowest `keep` m
+            m = s >= (s[-1] - keep)
+            L = dict(L)
+            for k in ("s_downstream", "z", "A", "x", "y"):
+                L[k] = list(np.asarray(L[k], float)[m])
+            s = np.asarray(L["s_downstream"], float); s = s - s[0]
         z = np.asarray(L["z"], float)
         A = np.asarray(L["A"], float)
         n = max(3, int(round((s[-1] - s[0]) / dx)) + 1)
