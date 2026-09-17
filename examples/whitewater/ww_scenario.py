@@ -116,6 +116,7 @@ while year < END_YEAR:
 
 out = dict(frames=frames, z_steady=z_steady, x=m["x"], Q=m["Q"], B=m["B"],
            z_dem=m["z_dem"], order=order, z_bl0=z_bl0,
+           px=m["px"], py=m["py"],
            start_year=START_YEAR, pulse_end=PULSE_END, end_year=END_YEAR,
            dam=(DAM_START, DAM_END, DAM_RISE),
            qchange=(Q_ZERO_YEAR, _yb, _fb), qanchors=(Q_ANCHOR_A, Q_ANCHOR_B),

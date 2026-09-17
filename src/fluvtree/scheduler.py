@@ -8,7 +8,7 @@ ordered list of **processes** (the ruleset). Each step, it runs every process's
 ``step(dt)`` in order -- each reads and writes the shared graph, so process *k*
 sees what processes ``0..k-1`` just did -- then advances time.
 
-Order is the modeller's to set (e.g. a lateral process before the vertical one).
+Order is the modeler's to set (e.g. a lateral process before the vertical one).
 Processes declare ``reads``/``writes`` (see the process interface); validating an
 ordering against those is a deferred hook, not done here yet.
 

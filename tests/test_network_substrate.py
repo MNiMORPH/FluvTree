@@ -50,7 +50,7 @@ def test_Y_heads_and_mouth():
     assert rn.mouth_segments() == [2]
 
 
-def test_Y_immediate_neighbours():
+def test_Y_immediate_neighbors():
     rn = _rn("Y")
     assert sorted(rn.upstream_segments(2)) == [0, 1]
     assert rn.upstream_segments(0) == []

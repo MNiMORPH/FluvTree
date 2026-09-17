@@ -126,7 +126,9 @@ def make(json_path, dx=100.0):
     net = build_network(up_ids, down_ids, x, z, Q, B,
                         S0=S0, x_bl=x_bl, z_bl=z_bl)
     return net, order, idx, dict(x=x, z=z, z_dem=z_dem, z_iso=z_iso, Q=Q, B=B,
-                                 S_reach=S_reach, S0=S0, x_bl=x_bl, z_bl=z_bl)
+                                 S_reach=S_reach, S0=S0, x_bl=x_bl, z_bl=z_bl,
+                                 px=[segs[c]["px"] for c in order],
+                                 py=[segs[c]["py"] for c in order])
 
 if __name__ == "__main__":
     net, order, idx, m = make(sys.argv[1])

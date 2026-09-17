@@ -28,7 +28,7 @@ import numpy as np
 def sweep_order(network):
     """
     Reaches in downstream-first (outlet -> upstream) order -- the valid sweep
-    order, since ``walk_upstream`` visits a reach before its upstream neighbours.
+    order, since ``walk_upstream`` visits a reach before its upstream neighbors.
     Topology is fixed, so this is computed once and reused.
     """
     mouth = network.mouth_segments()[0]

@@ -15,7 +15,7 @@ def compute_Q_s(network, closure, z, intermittency=1.0, sinuosity=1.0):
     Sediment discharge ``Q_s = k_Qs * I * Q * S**p`` at each node of the network.
 
     Slope ``S`` is a central difference on the ghost-padded profile (the boundary
-    slope ``S0`` at a channel head, base level at the outlet, the neighbour's
+    slope ``S0`` at a channel head, base level at the outlet, the neighbor's
     endpoint across an interior junction); at a confluence head the tributaries
     give one profile each and ``Q_s`` is their average -- the same walk GRLP's
     ``Network.compute_Q_s`` uses.

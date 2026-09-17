@@ -44,7 +44,11 @@ def build(path, dx=DX, clip=None):
         An = np.interp(sn, s, np.abs(A))
         d_out_end = dist_to_outlet(c)            # distance from this link's end to outlet
         x = -(d_out_end + (s[-1] - sn))          # negative upstream, 0 at outlet
-        segs[c] = dict(x=x, z=zn, A=An)
+        # planform of the CLIPPED link, on the model's nodes — the map must not
+        # draw the full-length line stretched onto fewer nodes
+        pxn = np.interp(sn, s, np.asarray(L["x"], float))
+        pyn = np.interp(sn, s, np.asarray(L["y"], float))
+        segs[c] = dict(x=x, z=zn, A=An, px=pxn, py=pyn)
 
     # The junction is a FACE, not a shared node: give the junction vertex to the
     # DOWNSTREAM link and end each upstream link one spacing earlier. Two nodes at
@@ -52,7 +56,7 @@ def build(path, dx=DX, clip=None):
     # warning only. (See LandGraph docs/SPEC-network-file.md §1.6.)
     for c in order:
         if to[c] != 0:
-            for k in ("x", "z", "A"):
+            for k in ("x", "z", "A", "px", "py"):
                 segs[c][k] = segs[c][k][:-1]
     return order, idx, to, up, segs
 

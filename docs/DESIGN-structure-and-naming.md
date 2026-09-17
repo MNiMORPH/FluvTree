@@ -25,7 +25,7 @@ model.run(until=…, dt=…)
 ## Scope
 
 Convergent river networks only — a deliberate invariant. Distributary, cyclic
-(braided), dynamic-topology, and step-backwater generalizations are analysed and
+(braided), dynamic-topology, and step-backwater generalizations are analyzed and
 deferred (see the frontiers note / memory).
 
 ## Layout — single `fluvtree` namespace under `src/`

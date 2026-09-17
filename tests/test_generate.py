@@ -29,7 +29,7 @@ def test_builds_valid_convergent_network():
     assert len(rn.segment_ids) == 2 * 8 - 1
     assert len(rn.head_segments()) == 8
     assert len(rn.mouth_segments()) == 1
-    # convergent: every non-mouth segment has exactly one downstream neighbour
+    # convergent: every non-mouth segment has exactly one downstream neighbor
     mouths = set(rn.mouth_segments())
     for s in rn.segment_ids:
         if s not in mouths:

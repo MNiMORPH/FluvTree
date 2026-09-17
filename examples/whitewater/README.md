@@ -16,7 +16,7 @@ pool itself, because the Whitewater progrades a delta into it. The river then ha
 
 **The valley keeps most of it** — 1.03 m removed in 420 years, from a peak of 3.50 m. That is the
 result of taking the valley width seriously (below): the bed diffusivity is low
-enough that a metres-thick alluvial fill is effectively permanent on human
+enough that a meters-thick alluvial fill is effectively permanent on human
 timescales. It is also what the Whitewater shows: the post-settlement alluvium is
 still there.
 
@@ -59,7 +59,7 @@ position, not by guessing from direction:
 | 15 | Trout Creek | lowest 4 km | 50 → 200 m |
 
 The sand reach begins ~1 km above Elba on the Middle Fork, so the forks join *inside*
-the modelled domain.
+the modeled domain.
 
 ## Head sediment supply is pinned as a FLUX, not a slope
 

@@ -39,7 +39,7 @@ def long_profile(network, ax=None, color="C0", connect_baselevel=True, **kwargs)
     ax : matplotlib Axes, optional
         Axes to draw on; a new figure/axes is made if omitted.
     color : optional
-        A single colour for the whole network, so it reads as one profile.
+        A single color for the whole network, so it reads as one profile.
     connect_baselevel : bool, optional
         Draw a connector from each mouth reach down to base level (default True).
     **kwargs
@@ -150,7 +150,7 @@ def planform(network, ax=None, spacing=1.0, **kwargs):
 
     Each reach is drawn at its own y-lane over its true ``x`` range and joined to
     its downstream reach at the confluence, so the network's branching structure is
-    legible (the FluvTree analogue of GRLP's ``Network.plot`` schematic). The
+    legible (the FluvTree analog of GRLP's ``Network.plot`` schematic). The
     ``y`` axis is schematic -- lanes, not coordinates -- since FluvTree's ``x`` is
     downstream distance, not a map coordinate; a true planform awaits map-coordinate
     fields (e.g. from DEM extraction).

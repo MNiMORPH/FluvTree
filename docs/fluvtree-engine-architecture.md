@@ -84,7 +84,7 @@ for _ in range(nt):
     t += dt
 ```
 
-Order matters and is the modeller's to set (lateral before vertical, etc.). Because
+Order matters and is the modeler's to set (lateral before vertical, etc.). Because
 processes declare `reads`/`writes`, the scheduler can later validate an ordering or
 warn on a read-before-write — not needed for v1, but the declaration earns its place.
 

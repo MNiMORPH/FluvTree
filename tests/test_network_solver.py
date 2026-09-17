@@ -95,7 +95,7 @@ def test_solver_is_genuinely_bdf2_not_backward_euler():
     DiffusionSolver(rn_bdf2, GravelClosure()).evolve(nt=_NT, dt=_DT, niter=NITER)
     diff = np.max(np.abs(rn_be.get_segment_field(0, "z")
                          - rn_bdf2.get_segment_field(0, "z")))
-    assert diff > 1e-3       # metres -- a real 2nd-order difference, not round-off
+    assert diff > 1e-3       # meters -- a real 2nd-order difference, not round-off
 
 
 def test_steady_state_uniform_slope():

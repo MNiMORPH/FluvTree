@@ -295,7 +295,7 @@ class DiffusionSolver(object):
                     RHS[g] = src[si][i]
                     continue
 
-                # ----- upstream neighbour (or head ghost) -----
+                # ----- upstream neighbor (or head ghost) -----
                 if i > 0:
                     up_g = g - 1
                     z_up, x_up, Q_up = z[i - 1], x[i - 1], Q[i - 1]
@@ -312,7 +312,7 @@ class DiffusionSolver(object):
                     up_g = starts[j] + lengths[j] - 1
                     z_up, x_up, Q_up = Z[j][-1], self.x[j][-1], self.Q[j][-1]
 
-                # ----- downstream neighbour (or outlet ghost) -----
+                # ----- downstream neighbor (or outlet ghost) -----
                 if i < L - 1:
                     down_g = g + 1
                     z_down, x_down, Q_down = z[i + 1], x[i + 1], Q[i + 1]

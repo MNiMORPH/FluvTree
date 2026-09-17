@@ -104,7 +104,7 @@ axM.set_xlim(min(p.min() for p in PX) / 1000 - 0.4, max(p.max() for p in PX) / 1
 axM.set_ylim(min(p.min() for p in PY) / 1000 - 0.4, max(p.max() for p in PY) / 1000 + 0.4)
 cb = fig.colorbar(segsM[0], ax=axM, fraction=0.055, pad=0.03,
                   orientation="horizontal", location="bottom")
-cb.set_label("metres of sediment", fontsize=9, color=MUTED)
+cb.set_label("meters of sediment", fontsize=9, color=MUTED)
 cb.ax.tick_params(labelsize=8, colors=MUTED); cb.outline.set_visible(False)
 
 # --- static: time series ---------------------------------------------------

@@ -116,7 +116,7 @@ a faithful port:**
   GRLP's `set_uplift_rate` / `set_source_sink_distributed` and composing together.
   This closes GRLP's full source-term set (`U`, `ssd`, fining).
 
-**Genuinely later (separate work, or the modeller's call):**
+**Genuinely later (separate work, or the modeler's call):**
 
 - The volume-first transform for spatially/temporally varying `B` (transient valley
   width — Andy's separate valley-realism task; add when a process needs dynamic width).
@@ -138,7 +138,7 @@ Per-reach inputs needed by the solver (build from `network` reach fields + closu
 `p`, `p_conductance`; topology (up/down); boundary (`S0`, `z_bl`, ghosts).
 
 The three assembly rules to lift (formulas verified in the vendored `solver.py`):
-- **Interior node** i (neighbours give `x_up,z_up,Q_up` and `x_down,z_down,Q_down`):
+- **Interior node** i (neighbors give `x_up,z_up,Q_up` and `x_down,z_down,Q_down`):
   `dx_up=x[i]-x_up; dx_down=x_down-x[i]; dx_2c=x_down-x_up; dQ_2c=Q_down-Q_up`;
   `S=|z_down-z_up|/dx_2c`; `C1=C0 * S**p_conductance * Q[i]/B[i]`;
   `center = -C1/dx_2c * (2p*(-1/dx_up - 1/dx_down)) + 1` (time_diag=1 for BE);

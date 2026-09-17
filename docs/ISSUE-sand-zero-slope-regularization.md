@@ -66,7 +66,7 @@ def m_Rh(closure, Q, S, S_eps=1e-12):
 # conductance:  C0*Q * max(S,S_eps)**(p-1) * m_Rh(...)   (S_eps floors S^(p-1) only)
 ```
 
-Verified behaviour (sand closure, D=1mm):
+Verified behavior (sand closure, D=1mm):
 
 ```
  S       b/h        m=R_h/h    conductance uncorr.   corrected

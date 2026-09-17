@@ -152,7 +152,7 @@ class RiverNetwork(object):
     def downstream_segment(self, seg):
         """The single segment immediately downstream, or ``None`` at the outlet.
 
-        Convergent tree: a segment has at most one downstream neighbour.
+        Convergent tree: a segment has at most one downstream neighbor.
         """
         _, v = self._edge_of[seg]
         outs = [d["seg"] for _, _, d in self.graph.out_edges(v, data=True)]
