@@ -2,20 +2,19 @@
 
 **1860–1940** post-settlement land clearance delivers sediment along the valley,
 aggrading it by ~3.6 m. **1933–1938** a lock and dam closes on the Mississippi,
-raising base level at the Whitewater's mouth by an effective **1 m** — the pool
-itself rises ~2.5 m, but the Whitewater progrades a delta into it, so the river sees
-less. The river then has until
+raising base level at the Whitewater's mouth by an effective **2 m** — less than the
+pool itself, because the Whitewater progrades a delta into it. The river then has until
 **2360** to clear what was dumped on it, and largely cannot.
 
 | year | mean stored | peak | base level | Q |
 |---|---|---|---|---|
-| 1932 (pre-dam) | +3.14 m | +3.24 m | — | ×1.00 |
-| 1940 | +3.49 m | +3.60 m | +1.00 m | ×1.00 |
-| 1990 | +3.46 m | +3.65 m | +1.00 m | ×1.10 |
-| 2030 | +3.33 m | +3.64 m | +1.00 m | ×1.20 |
-| 2360 | **+2.34 m** | +3.40 m | +1.00 m | ×1.20 |
+| 1932 (pre-dam) | +3.13 m | +3.24 m | — | ×1.00 |
+| 1940 | +3.50 m | +3.60 m | +2.00 m | ×1.00 |
+| 1990 | +3.49 m | +3.65 m | +2.00 m | ×1.10 |
+| 2030 | +3.37 m | +3.64 m | +2.00 m | ×1.20 |
+| 2360 | **+2.47 m** | +3.43 m | +2.00 m | ×1.20 |
 
-**The valley keeps most of it** — 1.15 m removed in 420 years, from a peak of 3.49 m. That is the
+**The valley keeps most of it** — 1.03 m removed in 420 years, from a peak of 3.50 m. That is the
 result of taking the valley width seriously (below): the bed diffusivity is low
 enough that a metres-thick alluvial fill is effectively permanent on human
 timescales. It is also what the Whitewater shows: the post-settlement alluvium is
@@ -56,8 +55,8 @@ position, not by guessing from direction:
 | 8 | South Fork | lowest 5 km | 200 m |
 | 16 | Elba → South Fork confluence | full | ramp |
 | 17, 19, 20 | mainstem to the mouth | full | ramp to 1000 m |
-| 18 | **Beaver Creek** — joins 0.67 km north of gauge 05376800, described as "0.5 mi above mouth of Beaver Creek" | full | 200 m |
-| 15 | Trout Creek | full | 50 → 200 m |
+| 18 | **Beaver Creek** — joins 0.67 km north of gauge 05376800, described as "0.5 mi above mouth of Beaver Creek" | lowest 4 km (it is only ~3.6 km, so uncut) | 200 m |
+| 15 | Trout Creek | lowest 4 km | 50 → 200 m |
 
 The sand reach begins ~1 km above Elba on the Middle Fork, so the forks join *inside*
 the modelled domain.
@@ -72,8 +71,8 @@ not by how much water the river carries.
 
 The scenario therefore pins `Q_s` at its pre-disturbance value and recomputes `S0`
 from it whenever `Q` changes. This is not cosmetic — it roughly triples what the
-river removes, from 0.44 m to **1.15 m** over 420 years, because the extra water now
-does net erosive work instead of arriving with proportionally more sediment.
+river removes, because the extra water now does net erosive work instead of arriving
+with proportionally more sediment.
 
 ## Choices that had to be made, and why
 

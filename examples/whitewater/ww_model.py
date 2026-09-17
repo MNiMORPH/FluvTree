@@ -35,8 +35,9 @@ MAINSTEM = (6, 16, 17, 19, 20)
 B_MAINSTEM = (500.0, 1000.0)      # ramped along the mainstem, upstream -> mouth
 B_TROUT    = (50.0, 200.0)        # ramped along Trout Creek
 B_FIXED    = {14: 200.0, 8: 200.0, 18: 200.0}     # forks and Beaver Creek
-CLIP_M     = {14: 5000.0, 8: 5000.0, 6: 1000.0}   # lower 5 km of each fork; 1 km
-                                                  # of Middle Fork above Elba
+CLIP_M     = {14: 5000.0, 8: 5000.0,      # lowest 5 km of each fork
+              18: 4000.0, 15: 4000.0,      # Beaver Creek, Trout Creek
+              6:  1000.0}                  # Middle Fork above Elba
 D, MANN, TAU = 0.3e-3, 0.03, 5.0     # the values in FluvTree's own sand tests
 CLOSURE = SandClosure(D=D, n=MANN, tau_crit_bank=TAU)
 

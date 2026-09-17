@@ -23,10 +23,9 @@ PULSE_M_PER_YR = 0.045          # illustrative supply rate during the pulse
 # navigation pool raises its base level. Ramped over five years rather than
 # imposed instantly: FluvTree has no ponding, so a step change in z_bl would be a
 # numerical shock standing in for a physical process it cannot represent.
-# The pool raises the Mississippi ~2.5 m here, but the Whitewater builds a delta
-# into it, so the base level the river actually sees rises by less. 1 m is the
-# effective value after progradation.
-DAM_START, DAM_END, DAM_RISE = 1933, 1938, 1.0
+# Effective base-level rise seen by the river, after the Whitewater progrades a
+# delta into the navigation pool.
+DAM_START, DAM_END, DAM_RISE = 1933, 1938, 2.0
 # A 15% rise in water discharge, ramped across a decade.
 # NOTE: this closure sets width as B = k*n*Q*S^(7/6), so B is PROPORTIONAL to Q,
 # while the bed diffusivity goes as Q/B. Scaling both together leaves the response
