@@ -6,6 +6,29 @@ raising base level at the Whitewater's mouth by an effective **2 m** — less th
 pool itself, because the Whitewater progrades a delta into it. The river then has until
 **2360** to clear what was dumped on it, and largely cannot.
 
+### Base level is the lever
+
+Three runs, identical but for the dam. Everything else — supply pulse, discharge
+schedule, valley widths, gauged discharge — is the same.
+
+| effective base-level rise | fill at 1940 | left in 2360 | cleared | % of fill |
+|---|---|---|---|---|
+| 2.0 m | 3.50 m | 2.47 m | 1.03 m | 29% |
+| 1.0 m | 3.48 m | 2.30 m | 1.18 m | 34% |
+| **none** | 3.47 m | **2.14 m** | 1.33 m | **38%** |
+
+Halving the drowning buys ~5 percentage points; removing it entirely buys ~9. The
+dam matters, but it is not what makes the fill persist — **even with no dam at all
+the valley keeps 62% of it after four centuries.** What sets that is the valley
+width: 500–1000 m of sediment to move at a slope of 5 × 10⁻⁴.
+
+Where the dam *does* show plainly is at the mouth. With no dam the fill thickness
+goes to zero there; with one it is pinned at the base-level rise, and the lowest few
+kilometers never clear.
+
+Renders: `whitewater_baselevel_1m.mp4`, `whitewater_nodam.mp4` (gitignored;
+regenerate with `ww_scenario.py` then `ww_animate.py`, setting `DAM_RISE`).
+
 | year | mean stored | peak | base level | Q |
 |---|---|---|---|---|
 | 1932 (pre-dam) | +3.13 m | +3.24 m | — | ×1.00 |

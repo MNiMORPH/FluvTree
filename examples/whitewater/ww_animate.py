@@ -102,7 +102,8 @@ cb.ax.tick_params(labelsize=8, colors=MUTED); cb.outline.set_visible(False)
 
 # --- static: time series ---------------------------------------------------
 axT.axvspan(tt.min(), PULSE_END, color=AGG, alpha=0.15, lw=0)
-axT.axvspan(DAM_A, DAM_B, color=POOL, alpha=0.30, lw=0)
+if DAM_RISE > 0:
+    axT.axvspan(DAM_A, DAM_B, color=POOL, alpha=0.30, lw=0)
 axT.axvspan(QA, QB, color=FLOW, alpha=0.26, lw=0)          # the ramp
 axT.axvspan(QB, tt.max(), color=FLOW, alpha=0.11, lw=0)    # held, not ended
 axT.plot(tt, mean_series, lw=2.0, color=AGG)
@@ -115,9 +116,10 @@ for sp in ("top", "right"): axT.spines[sp].set_visible(False)
 for sp in ("left", "bottom"): axT.spines[sp].set_color("#d0d0d0")
 axT.text(tt.min() + 8, max(mean_series) * 0.93, "supply pulse", ha="left",
          fontsize=9.5, color=AGG)
-axT.annotate("lock and dam", xy=(DAM_B, max(mean_series) * 0.42),
-             xytext=(DAM_B + 62, max(mean_series) * 0.26), fontsize=9.5, color=POOL,
-             arrowprops=dict(arrowstyle="->", color=POOL, lw=1.1))
+if DAM_RISE > 0:
+    axT.annotate("lock and dam", xy=(DAM_B, max(mean_series) * 0.42),
+                 xytext=(DAM_B + 62, max(mean_series) * 0.26), fontsize=9.5, color=POOL,
+                 arrowprops=dict(arrowstyle="->", color=POOL, lw=1.1))
 axT.annotate(f"discharge to +{100*(QF-1):.0f}%, then held",
              xy=(QB + 30, max(mean_series) * 0.28),
              xytext=(QB + 60, max(mean_series) * 0.08), fontsize=9.5, color=FLOW,
@@ -153,12 +155,13 @@ def update(k):
     pool_fill[0] = axP.fill_between([0.0, xr], [zb, zb], axP.get_ylim()[0],
                                     color=POOL, alpha=0.22, lw=0, zorder=1)
     rise = zb - Z_BL0
-    dam_note.set_text(f"navigation pool  ·  base level {rise:+.2f} m" if rise > 0.01 else "")
+    dam_note.set_text(f"navigation pool  ·  base level {rise:+.2f} m" if rise > 0.01
+                      else "base level unchanged  ·  no dam")
 
     ph = {"pulse": "land clearance upstream",
           "dam": "lock and dam closing",
           "wetter": f"discharge rising {100*(QF-1):.0f}%",
-          "recovery": "the river cannot clear it"}[f["phase"]]
+          "recovery": "the river works it down"}[f["phase"]]
     title.set_text("Whitewater River watershed")
     q = f.get("qscale", 1.0)
     sub.set_text(f"{f['year']:.0f}   ·   {ph}   ·   mean {mean_series[k]:+.2f} m stored"

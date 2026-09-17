@@ -25,7 +25,7 @@ PULSE_M_PER_YR = 0.045          # illustrative supply rate during the pulse
 # numerical shock standing in for a physical process it cannot represent.
 # Effective base-level rise seen by the river, after the Whitewater progrades a
 # delta into the navigation pool.
-DAM_START, DAM_END, DAM_RISE = 1933, 1938, 2.0
+DAM_START, DAM_END, DAM_RISE = 1933, 1938, 0.0
 # A 15% rise in water discharge, ramped across a decade.
 # NOTE: this closure sets width as B = k*n*Q*S^(7/6), so B is PROPORTIONAL to Q,
 # while the bed diffusivity goes as Q/B. Scaling both together leaves the response
@@ -93,7 +93,7 @@ def base_level(year):
 
 def phase_of(year):
     if year < PULSE_END and year < DAM_START:      return "pulse"
-    if DAM_START <= year <= DAM_END:               return "dam"
+    if DAM_RISE > 0 and DAM_START <= year <= DAM_END:  return "dam"
     if year < PULSE_END:                           return "pulse"
     if Q_ZERO_YEAR <= year <= _yb:                 return "wetter"
     return "recovery"
