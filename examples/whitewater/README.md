@@ -1,9 +1,30 @@
-# Sand-bed lower Whitewater — a sediment pulse and its aftermath
+# Sand-bed lower Whitewater — a sediment pulse, then a dam
 
-An 80-year sediment supply pulse aggrades the valley by ~3.6 m; 420 years of
-recovery clear about two thirds of it. The Whitewater is a classic
-post-settlement-alluvium valley, so the scenario is in the spirit of that history —
-but **the supply rate is illustrative, not a measured value.**
+**1860–1940** post-settlement land clearance delivers sediment along the valley,
+aggrading it by ~3.6 m. **1933–1938** a lock and dam closes on the Mississippi,
+raising base level at the Whitewater's mouth by 2.5 m. The river then has until
+**2360** to clear what was dumped on it, and largely cannot.
+
+| year | mean stored | peak |
+|---|---|---|
+| 1932 (pre-dam) | +2.71 m | +3.23 m |
+| 1940 | +3.08 m | +3.59 m |
+| 2100 | +2.99 m | +3.30 m |
+| 2360 | **+2.77 m** | +2.95 m |
+
+Without the dam the same pulse relaxes to **+1.05 m** over the same interval. Raising
+base level flattens the gradient near the mouth, transport capacity falls, and the
+post-settlement alluvium is **locked in** rather than exported. That contrast is the
+point of the run.
+
+The Whitewater is a classic post-settlement-alluvium valley and enters the Mississippi
+near Winona, so both forcings are in the spirit of its history — but **the supply rate
+is illustrative, not a measured value**, and the dam is a generic 2.5 m rise rather
+than a specific structure.
+
+**The base-level rise is ramped over five years, not stepped.** FluvTree cannot
+simulate ponding, so an instantaneous change in `z_bl` would be a numerical shock
+standing in for a physical process the model does not represent.
 
 Run in order:
 

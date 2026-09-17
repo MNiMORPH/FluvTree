@@ -15,8 +15,15 @@ from ww_model import make, CLOSURE, INTERMIT, RUNOFF
 from fluvtree.solvers.diffusion import DiffusionSolver
 
 YR = 3.15576e7
+START_YEAR = 1860               # post-settlement land clearance under way
+PULSE_END  = 1940               # supply falls away as conservation takes hold
+END_YEAR   = 2360
 PULSE_M_PER_YR = 0.045          # illustrative supply rate during the pulse
-PULSE_YR, RECOVER_YR = 80, 420
+# Lock and dam closure. The Whitewater enters the Mississippi near Winona, so a
+# navigation pool raises its base level. Ramped over five years rather than
+# imposed instantly: FluvTree has no ponding, so a step change in z_bl would be a
+# numerical shock standing in for a physical process it cannot represent.
+DAM_START, DAM_END, DAM_RISE = 1933, 1938, 2.5
 DT_YR = 2
 
 net, order, idx, m = make(sys.argv[1])
@@ -29,31 +36,46 @@ for _ in range(5):
 z_steady = [net.get_segment_field(s, "z").copy() for s in net.segment_ids]
 sol._zold2 = None; sol._dt_prev = None          # restart the BDF2 history cleanly
 
+z_bl0 = sol.z_bl
+
+def base_level(year):
+    """2.5 m of rise, ramped linearly across the closure years."""
+    f = np.clip((year - DAM_START) / float(DAM_END - DAM_START), 0.0, 1.0)
+    return z_bl0 + DAM_RISE * f
+
+def phase_of(year):
+    if year < PULSE_END and year < DAM_START:      return "pulse"
+    if DAM_START <= year <= DAM_END:               return "dam"
+    if year < PULSE_END:                           return "pulse"
+    return "recovery"
+
 frames = []
-def snap(t, phase):
-    frames.append(dict(t=t, phase=phase,
+def snap(year):
+    frames.append(dict(year=year, phase=phase_of(year), z_bl=sol.z_bl,
                        z=[net.get_segment_field(s, "z").copy() for s in net.segment_ids]))
 
-snap(0.0, "pulse")
-t = 0.0
-for _ in range(PULSE_YR // DT_YR):
-    sol.evolve(nt=1, dt=DT_YR * YR, niter=3,
-               source_rate=PULSE_M_PER_YR / YR)
-    t += DT_YR; snap(t, "pulse")
-for _ in range(RECOVER_YR // DT_YR):
-    sol.evolve(nt=1, dt=DT_YR * YR, niter=3)
-    t += DT_YR; snap(t, "recovery")
+year = float(START_YEAR)
+snap(year)
+while year < END_YEAR:
+    year += DT_YR
+    sol.z_bl = base_level(year)
+    src = PULSE_M_PER_YR / YR if year <= PULSE_END else None
+    sol.evolve(nt=1, dt=DT_YR * YR, niter=3, source_rate=src)
+    snap(year)
 
 out = dict(frames=frames, z_steady=z_steady, x=m["x"], Q=m["Q"], B=m["B"],
-           z_dem=m["z_dem"], order=order,
-           pulse_yr=PULSE_YR, dt_yr=DT_YR, pulse_rate=PULSE_M_PER_YR)
+           z_dem=m["z_dem"], order=order, z_bl0=z_bl0,
+           start_year=START_YEAR, pulse_end=PULSE_END, end_year=END_YEAR,
+           dam=(DAM_START, DAM_END, DAM_RISE), dt_yr=DT_YR, pulse_rate=PULSE_M_PER_YR)
 pickle.dump(out, open("/tmp/claude-1000/-home-awickert-models-FluvTree/4fd69dbf-d3b7-42b4-aeb8-7a9098b98b09/scratchpad/ww_frames.pkl", "wb"))
 
 dz = [np.concatenate([a - b for a, b in zip(f["z"], z_steady)]) for f in frames]
-peak = max(float(np.max(d)) for d in dz)
-low  = min(float(np.min(d)) for d in dz)
-iend = np.concatenate([a - b for a, b in zip(frames[PULSE_YR // DT_YR]["z"], z_steady)])
-print(f"{len(frames)} frames, {t:.0f} yr")
-print(f"peak aggradation {peak:+.2f} m   maximum incision below steady state {low:+.2f} m")
-print(f"at the end of the pulse: mean {iend.mean():+.2f} m, max {iend.max():+.2f} m")
-print(f"at the end:               mean {dz[-1].mean():+.2f} m, max {dz[-1].max():+.2f} m")
+yrs = np.array([f["year"] for f in frames])
+def at(y):
+    k = int(np.argmin(np.abs(yrs - y))); return dz[k]
+print(f"{len(frames)} frames, {START_YEAR}-{END_YEAR}")
+print(f"peak aggradation anywhere {max(float(np.max(d)) for d in dz):+.2f} m")
+for y in (1932, 1938, 1940, 2000, 2100, END_YEAR):
+    d = at(y)
+    print(f"  {y}: mean {d.mean():+.2f} m   max {d.max():+.2f} m   "
+          f"z_bl {frames[int(np.argmin(np.abs(yrs-y)))]['z_bl'] - z_bl0:+.2f} m")

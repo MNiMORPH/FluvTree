@@ -10,7 +10,8 @@ SP = "/tmp/claude-1000/-home-awickert-models-FluvTree/4fd69dbf-d3b7-42b4-aeb8-7a
 D = pickle.load(open(f"{SP}/ww_frames.pkl", "rb"))
 J = json.load(open(f"{SP}/wwsand2m.json"))
 frames, zs, X, order = D["frames"], D["z_steady"], D["x"], D["order"]
-PULSE, DT = D["pulse_yr"], D["dt_yr"]
+DAM_A, DAM_B, DAM_RISE = D["dam"]
+PULSE_END, Z_BL0 = D["pulse_end"], D["z_bl0"]
 
 # planform, resampled to the model nodes
 link = {l["source"]: l for l in J["links"]}
@@ -23,12 +24,12 @@ for i, c in enumerate(order):
     PY.append(np.interp(sn, s, np.asarray(L["y"], float)))
 
 INK, MUTED = "#1a1a1a", "#7a7a7a"
-AGG, INC = "#b07d3a", "#2d6e8e"          # diverging: sediment gained / lost
+AGG, POOL = "#b07d3a", "#2d6e8e"         # sediment stored / impounded water
 dzmax = max(float(np.max(np.concatenate([a - b for a, b in zip(f["z"], zs)])))
             for f in frames)
 mean_series = [float(np.mean(np.concatenate([a - b for a, b in zip(f["z"], zs)])))
                for f in frames]
-tt = np.array([f["t"] for f in frames])
+tt = np.array([f["year"] for f in frames])
 
 fig = plt.figure(figsize=(12.8, 7.2), facecolor="white")
 gs = fig.add_gridspec(2, 2, width_ratios=[2.25, 1], height_ratios=[2.5, 1],
@@ -45,6 +46,10 @@ allz = np.concatenate(zs)
 axP.set_xlim(min(x.min() for x in X) / 1000 - 0.4, 0.6)
 axP.set_ylim(allz.min() - 2.0, allz.max() + 5.0)
 axP.set_xlabel("distance from the mouth (km)", fontsize=10, color=MUTED)
+pool_line, = axP.plot([], [], lw=1.6, color=POOL, zorder=5)
+pool_fill = [None]
+dam_note = axP.text(0.42, 0.055, "", transform=axP.transAxes, fontsize=9.5,
+                    color=POOL, ha="left")
 axP.set_ylabel("bed elevation (m)", fontsize=10, color=MUTED)
 axP.tick_params(labelsize=9, colors=MUTED)
 axP.grid(axis="y", color="#ededed", lw=0.8); axP.set_axisbelow(True)
@@ -77,17 +82,21 @@ cb.set_label("metres of sediment", fontsize=9, color=MUTED)
 cb.ax.tick_params(labelsize=8, colors=MUTED); cb.outline.set_visible(False)
 
 # --- static: time series ---------------------------------------------------
-axT.axvspan(0, PULSE, color=AGG, alpha=0.16, lw=0)
+axT.axvspan(tt.min(), PULSE_END, color=AGG, alpha=0.15, lw=0)
+axT.axvspan(DAM_A, DAM_B, color=POOL, alpha=0.30, lw=0)
 axT.plot(tt, mean_series, lw=2.0, color=AGG)
 axT.set_xlim(tt.min(), tt.max()); axT.set_ylim(-0.12, max(mean_series) * 1.12)
-axT.set_xlabel("years since the pulse began", fontsize=9, color=MUTED)
+axT.set_xlabel("year", fontsize=9, color=MUTED)
 axT.set_ylabel("mean sediment stored (m)", fontsize=9, color=MUTED)
 axT.tick_params(labelsize=8, colors=MUTED)
 axT.grid(axis="y", color="#ededed", lw=0.8); axT.set_axisbelow(True)
 for sp in ("top", "right"): axT.spines[sp].set_visible(False)
 for sp in ("left", "bottom"): axT.spines[sp].set_color("#d0d0d0")
-axT.text(PULSE + 14, max(mean_series) * 0.93, "supply pulse", ha="left",
+axT.text(tt.min() + 8, max(mean_series) * 0.93, "supply pulse", ha="left",
          fontsize=9.5, color=AGG)
+axT.annotate("lock and dam", xy=(DAM_B, max(mean_series) * 0.40),
+             xytext=(DAM_B + 70, max(mean_series) * 0.30), fontsize=9.5, color=POOL,
+             arrowprops=dict(arrowstyle="->", color=POOL, lw=1.1))
 marker, = axT.plot([], [], "o", ms=7, color=INK, zorder=5)
 
 title = fig.text(0.058, 0.945, "", ha="left", fontsize=15.5, color=INK)
@@ -103,11 +112,25 @@ def update(k):
         fills[i] = axP.fill_between(X[i] / 1000, zs[i], f["z"][i],
                                     color=AGG, alpha=0.55, lw=0, zorder=3)
         segsM[i].set_array(dz[i])
-    marker.set_data([f["t"]], [mean_series[k]])
-    phase = "sediment pouring in" if f["phase"] == "pulse" else "the river clears it"
-    title.set_text(f"Lower Whitewater, sand bed — {phase}")
-    sub.set_text(f"year {f['t']:.0f} of {tt.max():.0f}    ·    "
-                 f"mean {mean_series[k]:+.2f} m    ·    peak {max(float(np.max(d)) for d in dz):+.2f} m")
+    marker.set_data([f["year"]], [mean_series[k]])
+
+    # the navigation pool at the mouth
+    zb = f["z_bl"]
+    xr = axP.get_xlim()[1]
+    pool_line.set_data([0.0, xr], [zb, zb])
+    if pool_fill[0] is not None:
+        pool_fill[0].remove()
+    pool_fill[0] = axP.fill_between([0.0, xr], [zb, zb], axP.get_ylim()[0],
+                                    color=POOL, alpha=0.22, lw=0, zorder=1)
+    rise = zb - Z_BL0
+    dam_note.set_text(f"navigation pool  ·  base level {rise:+.2f} m" if rise > 0.01 else "")
+
+    ph = {"pulse": "sediment pouring in",
+          "dam": "lock and dam closing",
+          "recovery": "the river cannot clear it"}[f["phase"]]
+    title.set_text(f"Lower Whitewater, sand bed — {ph}")
+    sub.set_text(f"{f['year']:.0f}    ·    mean {mean_series[k]:+.2f} m stored"
+                 f"    ·    peak {max(float(np.max(d)) for d in dz):+.2f} m")
     return lines + segsM + [marker]
 
 ani = FuncAnimation(fig, update, frames=len(frames), interval=70, blit=False)
