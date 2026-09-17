@@ -9,22 +9,15 @@ from matplotlib.collections import LineCollection
 
 SP = "/tmp/claude-1000/-home-awickert-models-FluvTree/4fd69dbf-d3b7-42b4-aeb8-7a9098b98b09/scratchpad"
 D = pickle.load(open(f"{SP}/ww_frames.pkl", "rb"))
-NET = sys.argv[2] if len(sys.argv) > 2 else f"{SP}/wwsand3.json"
-J = json.load(open(NET))
 frames, zs, X, order = D["frames"], D["z_steady"], D["x"], D["order"]
 DAM_A, DAM_B, DAM_RISE = D["dam"]
 QA, QB, QF = D["qchange"]
 PULSE_END, Z_BL0 = D["pulse_end"], D["z_bl0"]
 
-# planform, resampled to the model nodes
-link = {l["source"]: l for l in J["links"]}
-PX, PY = [], []
-for i, c in enumerate(order):
-    L = link[c]
-    s = np.asarray(L["s_downstream"], float); s -= s[0]
-    sn = np.linspace(s[0], s[-1], len(X[i]))
-    PX.append(np.interp(sn, s, np.asarray(L["x"], float)))
-    PY.append(np.interp(sn, s, np.asarray(L["y"], float)))
+# planform of the CLIPPED links, on the model's own nodes. Reconstructing it from
+# the source JSON instead draws each reach at FULL length, resampled onto however
+# many nodes the clipped model has — which looks plausible and is wrong.
+PX, PY = D["px"], D["py"]
 
 INK, MUTED = "#1a1a1a", "#7a7a7a"
 AGG, POOL, FLOW = "#b07d3a", "#2d6e8e", "#4f7f52"   # sediment / pool / discharge
