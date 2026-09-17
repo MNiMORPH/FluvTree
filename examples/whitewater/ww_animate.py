@@ -5,6 +5,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
+from matplotlib.collections import LineCollection
 
 SP = "/tmp/claude-1000/-home-awickert-models-FluvTree/4fd69dbf-d3b7-42b4-aeb8-7a9098b98b09/scratchpad"
 D = pickle.load(open(f"{SP}/ww_frames.pkl", "rb"))
@@ -84,17 +85,23 @@ axD.set_title("thickness of fill, reach by reach", fontsize=10.5, color=INK,
               loc="left", pad=5)
 
 # --- static: map -----------------------------------------------------------
-for i in range(len(order)):
-    axM.plot(PX[i] / 1000, PY[i] / 1000, lw=5.0, color="#ececec", zorder=1)
 axM.set_aspect("equal")
 axM.set_title("sediment stored, by reach", fontsize=10.5, color=INK, loc="left", pad=6)
 axM.tick_params(labelsize=8, colors=MUTED)
 axM.set_xticklabels([])
 axM.set_ylabel("northing (km)", fontsize=8.5, color=MUTED)
 for sp in axM.spines.values(): sp.set_color("#d0d0d0")
-segsM = [axM.scatter(PX[i] / 1000, PY[i] / 1000, s=16, c=np.zeros_like(PX[i]),
-                     cmap="YlOrBr", vmin=0, vmax=dzmax, zorder=3, linewidths=0)
-         for i in range(len(order))]
+segsM = []
+for i in range(len(order)):
+    pts = np.column_stack([PX[i] / 1000, PY[i] / 1000]).reshape(-1, 1, 2)
+    lc = LineCollection(np.concatenate([pts[:-1], pts[1:]], axis=1),
+                        cmap="YlOrBr", norm=plt.Normalize(0, dzmax),
+                        linewidths=4.0, capstyle="round", joinstyle="round", zorder=3)
+    lc.set_array(np.zeros(len(PX[i]) - 1))
+    axM.add_collection(lc)
+    segsM.append(lc)
+axM.set_xlim(min(p.min() for p in PX) / 1000 - 0.4, max(p.max() for p in PX) / 1000 + 0.4)
+axM.set_ylim(min(p.min() for p in PY) / 1000 - 0.4, max(p.max() for p in PY) / 1000 + 0.4)
 cb = fig.colorbar(segsM[0], ax=axM, fraction=0.055, pad=0.03,
                   orientation="horizontal", location="bottom")
 cb.set_label("metres of sediment", fontsize=9, color=MUTED)
@@ -119,8 +126,8 @@ axT.annotate("lock and dam", xy=(DAM_B, max(mean_series) * 0.42),
              xytext=(DAM_B + 62, max(mean_series) * 0.26), fontsize=9.5, color=POOL,
              arrowprops=dict(arrowstyle="->", color=POOL, lw=1.1))
 axT.annotate(f"discharge to +{100*(QF-1):.0f}%, then held",
-             xy=(QB + 40, max(mean_series) * 0.55),
-             xytext=(QB + 70, max(mean_series) * 0.72), fontsize=9.5, color=FLOW,
+             xy=(QB + 30, max(mean_series) * 0.28),
+             xytext=(QB + 60, max(mean_series) * 0.08), fontsize=9.5, color=FLOW,
              arrowprops=dict(arrowstyle="->", color=FLOW, lw=1.1))
 marker, = axT.plot([], [], "o", ms=7, color=INK, zorder=5)
 
@@ -136,7 +143,7 @@ def update(k):
             fills[i].remove()
         fills[i] = axP.fill_between(X[i] / 1000, zs[i], f["z"][i],
                                     color=AGG, alpha=0.55, lw=0, zorder=3)
-        segsM[i].set_array(dz[i])
+        segsM[i].set_array(0.5 * (dz[i][:-1] + dz[i][1:]))
         dlines[i].set_data(X[i] / 1000, dz[i])
         if dfills[i] is not None:
             dfills[i].remove()
@@ -159,11 +166,11 @@ def update(k):
           "dam": "lock and dam closing",
           "wetter": f"discharge rising {100*(QF-1):.0f}%",
           "recovery": "the river cannot clear it"}[f["phase"]]
-    title.set_text(f"Lower Whitewater, sand bed — {ph}")
+    title.set_text("Whitewater River watershed")
     q = f.get("qscale", 1.0)
-    sub.set_text(f"{f['year']:.0f}    ·    mean {mean_series[k]:+.2f} m stored"
-                 f"    ·    peak {max(float(np.max(d)) for d in dz):+.2f} m"
-                 + (f"    ·    Q x{q:.2f}" if q > 1.001 else ""))
+    sub.set_text(f"{f['year']:.0f}   ·   {ph}   ·   mean {mean_series[k]:+.2f} m stored"
+                 f"   ·   peak {max(float(np.max(d)) for d in dz):+.2f} m"
+                 + (f"   ·   Q x{q:.2f}" if q > 1.001 else ""))
     return lines + dlines + segsM + [marker]
 
 ani = FuncAnimation(fig, update, frames=len(frames), interval=70, blit=False)
