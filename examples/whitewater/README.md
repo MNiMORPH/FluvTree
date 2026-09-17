@@ -22,6 +22,11 @@ near Winona, so both forcings are in the spirit of its history — but **the sup
 is illustrative, not a measured value**, and the dam is a generic 2.5 m rise rather
 than a specific structure.
 
+**1985–1995** water discharge rises 15%, also ramped. Its effect is small — +2.74 m
+stored in 2360 against +2.77 m without it. Once base level is raised the system is
+**base-level-limited, not transport-limited**: the river's capacity to work is no
+longer what decides how much sediment stays.
+
 **The base-level rise is ramped over five years, not stepped.** FluvTree cannot
 simulate ponding, so an instantaneous change in `z_bl` would be a numerical shock
 standing in for a physical process the model does not represent.
@@ -71,7 +76,23 @@ smoothing window chosen — gives 18–133 m.
 
 **Parameters.** `D = 0.3 mm`, Manning `n = 0.03`, `tau_crit_bank = 5 Pa` — the values
 in FluvTree's own sand tests. Discharge is contributing area × `1e-7 m/s` with
-intermittency `0.05`; those two are illustrative.
+intermittency `0.05`, giving flood discharges of 4.4–82 m³/s and time-averaged
+0.22–4.1 m³/s. That is ~158 mm/yr of runoff, on the low side for southeastern
+Minnesota. Both are illustrative.
+
+**Response time.** Bed diffusivity `kappa = p k_Qs I Q S^(p-1) / ((1-lambda_p) B)` is
+1.5–2.6e-2 m²/s on the main stem, so `L^2/kappa` is ~770 yr over 25 km. Spin-up
+e-folds at ~450 yr, consistent. If the response looks fast, the levers are the reach
+slopes (`kappa ~ S^(-1/6)`, so flatter reaches are *more* diffusive) and `k_Qs`
+through `tau_crit_bank`.
+
+**Why raising discharge does so little, and a trap.** In this closure
+`B = k n Q S^(7/6)`, so **B is proportional to Q**, while the bed diffusivity goes as
+`Q/B`. Scaling discharge *with the closure's own width relation* therefore leaves the
+response **exactly unchanged** — the widening cancels the extra transport. The run
+holds `B` fixed, which is the defensible short-term case for cohesive banks, so the
+15% does raise `kappa` by 15%. It still barely moves the outcome, for the separate
+reason above: base level, not capacity, is the limit.
 
 ## Why sand only
 

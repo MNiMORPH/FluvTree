@@ -11,6 +11,7 @@ D = pickle.load(open(f"{SP}/ww_frames.pkl", "rb"))
 J = json.load(open(f"{SP}/wwsand2m.json"))
 frames, zs, X, order = D["frames"], D["z_steady"], D["x"], D["order"]
 DAM_A, DAM_B, DAM_RISE = D["dam"]
+QA, QB, QF = D["qchange"]
 PULSE_END, Z_BL0 = D["pulse_end"], D["z_bl0"]
 
 # planform, resampled to the model nodes
@@ -24,7 +25,7 @@ for i, c in enumerate(order):
     PY.append(np.interp(sn, s, np.asarray(L["y"], float)))
 
 INK, MUTED = "#1a1a1a", "#7a7a7a"
-AGG, POOL = "#b07d3a", "#2d6e8e"         # sediment stored / impounded water
+AGG, POOL, FLOW = "#b07d3a", "#2d6e8e", "#4f7f52"   # sediment / pool / discharge
 dzmax = max(float(np.max(np.concatenate([a - b for a, b in zip(f["z"], zs)])))
             for f in frames)
 mean_series = [float(np.mean(np.concatenate([a - b for a, b in zip(f["z"], zs)])))
@@ -84,6 +85,7 @@ cb.ax.tick_params(labelsize=8, colors=MUTED); cb.outline.set_visible(False)
 # --- static: time series ---------------------------------------------------
 axT.axvspan(tt.min(), PULSE_END, color=AGG, alpha=0.15, lw=0)
 axT.axvspan(DAM_A, DAM_B, color=POOL, alpha=0.30, lw=0)
+axT.axvspan(QA, QB, color=FLOW, alpha=0.26, lw=0)
 axT.plot(tt, mean_series, lw=2.0, color=AGG)
 axT.set_xlim(tt.min(), tt.max()); axT.set_ylim(-0.12, max(mean_series) * 1.12)
 axT.set_xlabel("year", fontsize=9, color=MUTED)
@@ -94,9 +96,12 @@ for sp in ("top", "right"): axT.spines[sp].set_visible(False)
 for sp in ("left", "bottom"): axT.spines[sp].set_color("#d0d0d0")
 axT.text(tt.min() + 8, max(mean_series) * 0.93, "supply pulse", ha="left",
          fontsize=9.5, color=AGG)
-axT.annotate("lock and dam", xy=(DAM_B, max(mean_series) * 0.40),
-             xytext=(DAM_B + 70, max(mean_series) * 0.30), fontsize=9.5, color=POOL,
+axT.annotate("lock and dam", xy=(DAM_B, max(mean_series) * 0.42),
+             xytext=(DAM_B + 62, max(mean_series) * 0.26), fontsize=9.5, color=POOL,
              arrowprops=dict(arrowstyle="->", color=POOL, lw=1.1))
+axT.annotate(f"discharge +{100*(QF-1):.0f}%", xy=(QB, max(mean_series) * 0.62),
+             xytext=(QB + 62, max(mean_series) * 0.70), fontsize=9.5, color=FLOW,
+             arrowprops=dict(arrowstyle="->", color=FLOW, lw=1.1))
 marker, = axT.plot([], [], "o", ms=7, color=INK, zorder=5)
 
 title = fig.text(0.058, 0.945, "", ha="left", fontsize=15.5, color=INK)
@@ -125,12 +130,15 @@ def update(k):
     rise = zb - Z_BL0
     dam_note.set_text(f"navigation pool  ·  base level {rise:+.2f} m" if rise > 0.01 else "")
 
-    ph = {"pulse": "sediment pouring in",
+    ph = {"pulse": "land clearance upstream",
           "dam": "lock and dam closing",
+          "wetter": f"discharge rising {100*(QF-1):.0f}%",
           "recovery": "the river cannot clear it"}[f["phase"]]
     title.set_text(f"Lower Whitewater, sand bed — {ph}")
+    q = f.get("qscale", 1.0)
     sub.set_text(f"{f['year']:.0f}    ·    mean {mean_series[k]:+.2f} m stored"
-                 f"    ·    peak {max(float(np.max(d)) for d in dz):+.2f} m")
+                 f"    ·    peak {max(float(np.max(d)) for d in dz):+.2f} m"
+                 + (f"    ·    Q x{q:.2f}" if q > 1.001 else ""))
     return lines + segsM + [marker]
 
 ani = FuncAnimation(fig, update, frames=len(frames), interval=70, blit=False)
