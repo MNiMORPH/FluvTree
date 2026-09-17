@@ -2,17 +2,20 @@
 
 **1860–1940** post-settlement land clearance delivers sediment along the valley,
 aggrading it by ~3.6 m. **1933–1938** a lock and dam closes on the Mississippi,
-raising base level at the Whitewater's mouth by 2.5 m. The river then has until
+raising base level at the Whitewater's mouth by an effective **1 m** — the pool
+itself rises ~2.5 m, but the Whitewater progrades a delta into it, so the river sees
+less. The river then has until
 **2360** to clear what was dumped on it, and largely cannot.
 
-| year | mean stored | peak |
-|---|---|---|
-| 1932 (pre-dam) | +3.08 m | +3.24 m |
-| 1940 | +3.46 m | +3.60 m |
-| 2100 | +3.45 m | +3.64 m |
-| 2360 | **+3.35 m** | +3.64 m |
+| year | mean stored | peak | base level | Q |
+|---|---|---|---|---|
+| 1932 (pre-dam) | +3.08 m | +3.24 m | — | ×1.00 |
+| 1940 | +3.43 m | +3.60 m | +1.00 m | ×1.00 |
+| 1990 | +3.40 m | +3.64 m | +1.00 m | ×1.10 |
+| 2030 | +3.34 m | +3.64 m | +1.00 m | ×1.20 |
+| 2360 | **+2.99 m** | +3.64 m | +1.00 m | ×1.20 |
 
-**The valley keeps almost all of it** — 0.11 m removed in 420 years. That is the
+**The valley keeps almost all of it** — 0.44 m removed in 420 years. That is the
 result of taking the valley width seriously (below): the bed diffusivity is low
 enough that a metres-thick alluvial fill is effectively permanent on human
 timescales. It is also what the Whitewater shows: the post-settlement alluvium is
@@ -23,10 +26,9 @@ near Winona, so both forcings are in the spirit of its history — but **the sup
 is illustrative, not a measured value**, and the dam is a generic 2.5 m rise rather
 than a specific structure.
 
-**1985–1995** water discharge rises 15%, also ramped. Its effect is small — +2.74 m
-stored in 2360 against +2.77 m without it. Once base level is raised the system is
-**base-level-limited, not transport-limited**: the river's capacity to work is no
-longer what decides how much sediment stays.
+**Discharge rises** to +10% by 1990 and +20% by 2030, then holds. Those two anchors
+define a single straight line, which reaches zero in 1950 — so the ramp is clipped
+there rather than given an invented start date.
 
 **The base-level rise is ramped over five years, not stepped.** FluvTree cannot
 simulate ponding, so an instantaneous change in `z_bl` would be a numerical shock

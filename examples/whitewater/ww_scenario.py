@@ -23,7 +23,10 @@ PULSE_M_PER_YR = 0.045          # illustrative supply rate during the pulse
 # navigation pool raises its base level. Ramped over five years rather than
 # imposed instantly: FluvTree has no ponding, so a step change in z_bl would be a
 # numerical shock standing in for a physical process it cannot represent.
-DAM_START, DAM_END, DAM_RISE = 1933, 1938, 2.5
+# The pool raises the Mississippi ~2.5 m here, but the Whitewater builds a delta
+# into it, so the base level the river actually sees rises by less. 1 m is the
+# effective value after progradation.
+DAM_START, DAM_END, DAM_RISE = 1933, 1938, 1.0
 # A 15% rise in water discharge, ramped across a decade.
 # NOTE: this closure sets width as B = k*n*Q*S^(7/6), so B is PROPORTIONAL to Q,
 # while the bed diffusivity goes as Q/B. Scaling both together leaves the response
@@ -31,7 +34,10 @@ DAM_START, DAM_END, DAM_RISE = 1933, 1938, 2.5
 # channel does not widen in proportion — so B is held fixed here, which is the
 # defensible short-term case for cohesive banks. Over long enough for the banks to
 # adjust, the effect would cancel.
-Q_START, Q_END, Q_FACTOR = 1985, 1995, 1.15
+# Two anchors: +10% in 1990, +20% in 2030, held at +20% afterwards. A single
+# straight line through both reaches zero in 1950, so no extra date is invented;
+# it is simply clipped there and at the +20% ceiling.
+Q_ANCHOR_A, Q_ANCHOR_B = (1990, 1.10), (2030, 1.20)
 DT_YR = 2
 
 net, order, idx, m = make(sys.argv[1])
@@ -58,9 +64,12 @@ sol._zold2 = None; sol._dt_prev = None          # restart the BDF2 history clean
 z_bl0 = sol.z_bl
 Q0 = [q.copy() for q in sol.Q]
 
+(_ya, _fa), (_yb, _fb) = Q_ANCHOR_A, Q_ANCHOR_B
+_slope = (_fb - _fa) / (_yb - _ya)
+Q_ZERO_YEAR = _ya - (_fa - 1.0) / _slope          # 1950
+
 def set_discharge(year):
-    f = np.clip((year - Q_START) / float(Q_END - Q_START), 0.0, 1.0)
-    scale = 1.0 + (Q_FACTOR - 1.0) * f
+    scale = float(np.clip(_fa + _slope * (year - _ya), 1.0, _fb))
     sol.Q = [q * scale for q in Q0]          # B deliberately NOT rescaled
     return scale
 
@@ -73,7 +82,7 @@ def phase_of(year):
     if year < PULSE_END and year < DAM_START:      return "pulse"
     if DAM_START <= year <= DAM_END:               return "dam"
     if year < PULSE_END:                           return "pulse"
-    if Q_START <= year <= Q_END:                   return "wetter"
+    if Q_ZERO_YEAR <= year <= _yb:                 return "wetter"
     return "recovery"
 
 frames = []
@@ -95,7 +104,8 @@ while year < END_YEAR:
 out = dict(frames=frames, z_steady=z_steady, x=m["x"], Q=m["Q"], B=m["B"],
            z_dem=m["z_dem"], order=order, z_bl0=z_bl0,
            start_year=START_YEAR, pulse_end=PULSE_END, end_year=END_YEAR,
-           dam=(DAM_START, DAM_END, DAM_RISE), qchange=(Q_START, Q_END, Q_FACTOR),
+           dam=(DAM_START, DAM_END, DAM_RISE),
+           qchange=(Q_ZERO_YEAR, _yb, _fb), qanchors=(Q_ANCHOR_A, Q_ANCHOR_B),
            dt_yr=DT_YR, pulse_rate=PULSE_M_PER_YR)
 pickle.dump(out, open("/tmp/claude-1000/-home-awickert-models-FluvTree/4fd69dbf-d3b7-42b4-aeb8-7a9098b98b09/scratchpad/ww_frames.pkl", "wb"))
 
@@ -105,7 +115,7 @@ def at(y):
     k = int(np.argmin(np.abs(yrs - y))); return dz[k]
 print(f"{len(frames)} frames, {START_YEAR}-{END_YEAR}")
 print(f"peak aggradation anywhere {max(float(np.max(d)) for d in dz):+.2f} m")
-for y in (1932, 1938, 1940, 1984, 1996, 2100, END_YEAR):
+for y in (1932, 1938, 1940, 1990, 2030, 2100, END_YEAR):
     d = at(y)
     print(f"  {y}: mean {d.mean():+.2f} m   max {d.max():+.2f} m   "
           f"z_bl {frames[int(np.argmin(np.abs(yrs-y)))]['z_bl'] - z_bl0:+.2f} m   "
