@@ -39,8 +39,19 @@ sol = DiffusionSolver(net, CLOSURE, intermittency=INTERMIT)
 warnings.simplefilter("ignore")
 
 # --- spin-up ---------------------------------------------------------------
-for _ in range(5):
-    sol.evolve(nt=40, dt=25 * YR, niter=3)
+# The valley is 500-1000 m wide, so the bed diffusivity is roughly an order of
+# magnitude lower than a channel-width model would give, and equilibration takes
+# tens of thousands of years rather than thousands. Run until the rate of change
+# is negligible rather than for a fixed span.
+prev = np.concatenate([net.get_segment_field(s2, "z").copy() for s2 in net.segment_ids])
+for blk in range(40):
+    sol.evolve(nt=40, dt=250 * YR, niter=3)
+    cur = np.concatenate([net.get_segment_field(s2, "z") for s2 in net.segment_ids])
+    rate = np.max(np.abs(cur - prev)) / (40 * 250)
+    prev = cur.copy()
+    if rate < 1e-7:
+        break
+print(f"spin-up: {(blk + 1) * 40 * 250:,} yr, final |dz/dt| = {rate:.2e} m/yr")
 z_steady = [net.get_segment_field(s, "z").copy() for s in net.segment_ids]
 sol._zold2 = None; sol._dt_prev = None          # restart the BDF2 history cleanly
 

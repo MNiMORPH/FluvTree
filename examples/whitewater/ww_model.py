@@ -6,9 +6,25 @@ from build_ww import build
 from fluvtree.processes import build_network
 from fluvtree.closures.sand import SandClosure
 
-# --- modelling choices, stated rather than buried ---------------------------
-RUNOFF   = 1.0e-7     # m/s of contributing area -> flood discharge
-INTERMIT = 0.05       # fraction of time that discharge flows
+# --- discharge, from USGS 05376800 "Whitewater River near Beaver, MN" -------
+# Drainage area 271 mi2 = 702 km2, 4.7 mi north of Elba.
+#   annual means, 14 water years 1976-1998: mean 168.4 cfs = 4.77 m3/s
+#     -> 214 mm/yr of runoff
+#   annual peaks, 38 water years 1938-1999, Weibull plotting positions:
+#     Q_2 = 3355 cfs = 95.0 m3/s   (Q_1.5 = 2210 cfs = 62.6 m3/s)
+# Take the formative discharge as Q_2 and set intermittency so that I*Q
+# reproduces the mean annual flow: I = 4.77 / 95.0 = 0.0502.
+# Scaled to other reaches by contributing area, i.e. constant specific discharge.
+Q2_BEAVER, A_BEAVER = 95.0, 702.0e6
+RUNOFF   = Q2_BEAVER / A_BEAVER      # 1.353e-7 m/s -> formative discharge
+INTERMIT = 4.77 / Q2_BEAVER          # 0.0502
+
+# --- valley width ----------------------------------------------------------
+# B in the solver is the width sediment is spread over — the VALLEY, not the
+# channel. (An earlier version of this script used the closure's channel_width,
+# which is a diagnostic, not this. That made the bed roughly an order of
+# magnitude too responsive.) Ramped linearly along the network.
+B_UPSTREAM, B_MOUTH = 500.0, 1000.0
 D, MANN, TAU = 0.3e-3, 0.03, 5.0     # the values in FluvTree's own sand tests
 CLOSURE = SandClosure(D=D, n=MANN, tau_crit_bank=TAU)
 
@@ -49,16 +65,13 @@ def make(json_path, dx=100.0):
     Q  = [np.maximum.accumulate(np.abs(segs[c]["A"])) * RUNOFF for c in order]
 
     # width from the closure's own hydraulic geometry, at the local bed slope
-    # Width from the closure's own hydraulic geometry, evaluated at the REACH-AVERAGE
-    # slope. Node-to-node slopes off a DEM are far too variable for a law that goes as
-    # S**(7/6) — they gave widths from 0 to 2282 m on this network. One slope per link
-    # is taken from the data (end-to-end over the isotonic profile), so nothing is
-    # invented and no smoothing window is chosen.
-    B, S_reach = [], []
-    for i, c in enumerate(order):
-        Sr = float((z_iso[i][0] - z_iso[i][-1]) / (x[i][-1] - x[i][0]))
-        S_reach.append(Sr)
-        B.append(CLOSURE.channel_width(Q[i], np.full_like(Q[i], Sr)))
+    # Reach-average slope, from the data (end-to-end over the isotonic profile).
+    S_reach = [float((z_iso[i][0] - z_iso[i][-1]) / (x[i][-1] - x[i][0]))
+               for i in range(len(order))]
+
+    # Valley width, ramped linearly from the upstream end of the network to the mouth.
+    x_up = min(float(xx[0]) for xx in x)
+    B = [B_UPSTREAM + (B_MOUTH - B_UPSTREAM) * (xx - x_up) / (0.0 - x_up) for xx in x]
 
     # head slope from the local bed, outlet base level from the DEM
     # INITIAL CONDITION. The raw DEM trace cannot be used directly: 25% of its
@@ -103,6 +116,6 @@ if __name__ == "__main__":
     for i, c in enumerate(order):
         print(f"  seg {i} (cat {c:>3}): {len(m['x'][i]):>4} nodes  "
               f"Q {m['Q'][i][0]:6.2f}..{m['Q'][i][-1]:6.2f} m3/s   "
-              f"S {m['S_reach'][i]:.5f}  B {m['B'][i].min():6.1f}..{m['B'][i].max():6.1f} m")
+              f"S {m['S_reach'][i]:.5f}  B_valley {m['B'][i].min():6.0f}..{m['B'][i].max():6.0f} m")
     print(f"  S0 (per head) {['%.5f' % s for s in m['S0']]}")
     print(f"  x_bl {m['x_bl']:.1f}   z_bl {m['z_bl']:.3f}")

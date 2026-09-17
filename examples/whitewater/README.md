@@ -7,15 +7,16 @@ raising base level at the Whitewater's mouth by 2.5 m. The river then has until
 
 | year | mean stored | peak |
 |---|---|---|
-| 1932 (pre-dam) | +2.71 m | +3.23 m |
-| 1940 | +3.08 m | +3.59 m |
-| 2100 | +2.99 m | +3.30 m |
-| 2360 | **+2.77 m** | +2.95 m |
+| 1932 (pre-dam) | +3.08 m | +3.24 m |
+| 1940 | +3.46 m | +3.60 m |
+| 2100 | +3.45 m | +3.64 m |
+| 2360 | **+3.35 m** | +3.64 m |
 
-Without the dam the same pulse relaxes to **+1.05 m** over the same interval. Raising
-base level flattens the gradient near the mouth, transport capacity falls, and the
-post-settlement alluvium is **locked in** rather than exported. That contrast is the
-point of the run.
+**The valley keeps almost all of it** — 0.11 m removed in 420 years. That is the
+result of taking the valley width seriously (below): the bed diffusivity is low
+enough that a metres-thick alluvial fill is effectively permanent on human
+timescales. It is also what the Whitewater shows: the post-settlement alluvium is
+still there.
 
 The Whitewater is a classic post-settlement-alluvium valley and enters the Mississippi
 near Winona, so both forcings are in the spirit of its history — but **the supply rate
@@ -74,17 +75,29 @@ channel width itself. Evaluated at node-to-node DEM slopes it gave widths from 0
 2282 m, because the law goes as `S^(7/6)`. One slope per link — from the data, no
 smoothing window chosen — gives 18–133 m.
 
-**Parameters.** `D = 0.3 mm`, Manning `n = 0.03`, `tau_crit_bank = 5 Pa` — the values
-in FluvTree's own sand tests. Discharge is contributing area × `1e-7 m/s` with
-intermittency `0.05`, giving flood discharges of 4.4–82 m³/s and time-averaged
-0.22–4.1 m³/s. That is ~158 mm/yr of runoff, on the low side for southeastern
-Minnesota. Both are illustrative.
+**Discharge, from the gauge.** USGS **05376800**, *Whitewater River near Beaver, MN*,
+271 mi² = 702 km², 4.7 mi north of Elba.
 
-**Response time.** Bed diffusivity `kappa = p k_Qs I Q S^(p-1) / ((1-lambda_p) B)` is
-1.5–2.6e-2 m²/s on the main stem, so `L^2/kappa` is ~770 yr over 25 km. Spin-up
-e-folds at ~450 yr, consistent. If the response looks fast, the levers are the reach
-slopes (`kappa ~ S^(-1/6)`, so flatter reaches are *more* diffusive) and `k_Qs`
-through `tau_crit_bank`.
+- 14 water years of annual means (1976–1998): **168.4 cfs = 4.77 m³/s**, i.e.
+  **214 mm/yr** of runoff
+- 38 water years of annual peaks (1938–1999), Weibull plotting positions:
+  **Q₂ = 3355 cfs = 95.0 m³/s**; Q₁.₅ = 2210 cfs = 62.6 m³/s
+
+The formative discharge is taken as Q₂, and intermittency set so `I·Q` reproduces the
+mean annual flow: **I = 4.77 / 95.0 = 0.0502**. Scaled to other reaches by
+contributing area (constant specific discharge), which gives 4.1–111 m³/s across the
+network.
+
+**Valley width is `B`, not channel width.** `B` in the solver is the width sediment is
+spread over. An earlier version of this script used `SandClosure.channel_width`, which
+is a *diagnostic* — 18–133 m instead of 500–1000 m. That made the bed roughly an
+order of magnitude too responsive and is the single largest correction this example
+has had. Width now ramps linearly from 500 m at the upstream end to 1000 m at the
+mouth.
+
+**Response time.** With the valley width, spin-up takes **50,000 years** to
+equilibrate, against ~5,000 with a channel width. That is why the post-settlement fill
+does not clear.
 
 **Why raising discharge does so little, and a trap.** In this closure
 `B = k n Q S^(7/6)`, so **B is proportional to Q**, while the bed diffusivity goes as
