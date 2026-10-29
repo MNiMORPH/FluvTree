@@ -20,6 +20,21 @@ so it is exact in one pass, and unconditionally stable at any ``dt``.
 
 State lives on the graph: ``x, z, Q`` per reach (edges), base level on the outlet
 node. ``z`` arrays are mutated in place, so the graph is updated directly.
+
+VERTICAL SOURCE TERM. ``dz/dt = source - K Q**m S``, where ``source`` is a rate
+[m/s] on the bed: tectonic uplift or subsidence, and anything else that moves
+the bed without being part of the incision term. It is composed exactly as
+:mod:`fluvtree.solvers.diffusion` composes its own, so a forcing specified once
+drives either solver:
+
+    source = optional graph "source" field  +  source_rate argument  +  U
+
+all three in m/s, all optional. ``U`` is the scalar shorthand kept from the
+original interface; ``source_rate`` is the general per-segment form that
+:func:`fluvtree.common.rates.broadcast_rate` produces, which is what makes
+spatially variable uplift possible here. Note that a *sediment* source or sink
+has no meaning for this solver -- detachment-limited incision carries no
+sediment budget at all -- so only vertical bed motion belongs in it.
 """
 
 import numpy as np
@@ -35,12 +50,39 @@ def sweep_order(network):
     return network.walk_upstream(mouth)
 
 
-def incise_n1_step(network, order, K, m, U, dt):
+def _source_per_segment(network, order, source_rate, U):
+    """Per-node vertical source rate [m/s] for each reach, as diffusion builds it.
+
+    The optional graph ``"source"`` field, plus the ``source_rate`` argument
+    (scalar or per-segment), plus the scalar ``U``. Returns a dict keyed by
+    segment id so the sweep can index it the same way it indexes ``z_old``.
+    """
+    seg_index = {s: i for i, s in enumerate(network.segment_ids)}
+    out = {}
+    for s in order:
+        n = len(network.get_segment_field(s, "x"))
+        try:
+            r = np.asarray(network.get_segment_field(s, "source"), float)
+            r = np.broadcast_to(r, (n,)).astype(float, copy=True)
+        except KeyError:
+            r = np.zeros(n)
+        if source_rate is not None:
+            if np.isscalar(source_rate):
+                r = r + float(source_rate)
+            else:
+                r = r + np.asarray(source_rate[seg_index[s]], float)
+        out[s] = r + float(U)
+    return out
+
+
+def incise_n1_step(network, order, K, m, U, dt, source_rate=None):
     """
     One implicit ``n = 1`` stream-power step over the network, in place on ``z``.
 
-    ``K`` erodibility, ``m`` discharge exponent, ``U`` uplift rate (scalar), ``dt``
-    time step. ``order`` from :func:`sweep_order`.
+    ``K`` erodibility, ``m`` discharge exponent, ``dt`` time step, ``order`` from
+    :func:`sweep_order`. ``U`` is a scalar uplift rate and ``source_rate`` the
+    general per-segment vertical source [m/s]; both are optional and they sum,
+    together with an optional graph ``"source"`` field. See the module docstring.
     """
     outlet_node = network.edge_of(network.mouth_segments()[0])[1]
     z_bl = network.get_node_field(outlet_node, "z_bl")
@@ -48,6 +90,7 @@ def incise_n1_step(network, order, K, m, U, dt):
 
     # start-of-step elevations (the time term), snapshot before any node moves
     z_old = {s: network.get_segment_field(s, "z").copy() for s in order}
+    src = _source_per_segment(network, order, source_rate, U)
 
     for s in order:
         x = network.get_segment_field(s, "x")
@@ -70,14 +113,14 @@ def incise_n1_step(network, order, K, m, U, dt):
             else:
                 z_r, x_r = z[i + 1], x[i + 1]
             c = dt * K * Q[i] ** m / (x_r - x[i])
-            z[i] = (z_old[s][i] + dt * U + c * z_r) / (1.0 + c)
+            z[i] = (z_old[s][i] + dt * src[s][i] + c * z_r) / (1.0 + c)
 
 
-def evolve_streampower_n1(network, K, m, U, dt, nt=1):
+def evolve_streampower_n1(network, K, m, U, dt, nt=1, source_rate=None):
     """Advance ``nt`` implicit ``n = 1`` stream-power steps of ``dt`` in place."""
     order = sweep_order(network)
     for _ in range(int(nt)):
-        incise_n1_step(network, order, K, m, U, dt)
+        incise_n1_step(network, order, K, m, U, dt, source_rate=source_rate)
 
 
 class AdvectionSolver(object):
@@ -99,7 +142,12 @@ class AdvectionSolver(object):
         self.U = U
         self._order = sweep_order(network)
 
-    def evolve(self, nt, dt):
-        """Advance ``nt`` implicit ``n = 1`` steps of ``dt`` [s], in place on the graph."""
+    def evolve(self, nt, dt, source_rate=None):
+        """Advance ``nt`` implicit ``n = 1`` steps of ``dt`` [s], in place on the graph.
+
+        ``source_rate`` is the optional per-segment vertical source [m/s], the
+        same argument :meth:`fluvtree.solvers.diffusion.DiffusionSolver.evolve`
+        takes."""
         for _ in range(int(nt)):
-            incise_n1_step(self.network, self._order, self.K, self.m, self.U, dt)
+            incise_n1_step(self.network, self._order, self.K, self.m, self.U,
+                           dt, source_rate=source_rate)
